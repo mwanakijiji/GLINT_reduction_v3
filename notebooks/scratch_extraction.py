@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from utils import basic_fcns
+import time
 
 
 
@@ -60,25 +61,27 @@ print("Sum along y-axis:", sum_along_y)
 
 if __name__ == "__main__":
 
+    start_time = time.time()
+
     stem = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/data/'
 
     # true data
-    '''
     test_frame = basic_fcns.read_fits_file(stem + 'sample_data_3_spec.fits')
     test_data_slice = test_frame[0,:,:]
     test_variance_slice = test_frame[1,:,:]
-    '''
 
-    import ipdb; ipdb.set_trace()
+    #import ipdb; ipdb.set_trace()
 
     # fake data
+    '''
     test_frame = basic_fcns.read_fits_file('test_array.fits')
     test_data_slice = test_frame
     test_variance_slice = np.sqrt(test_data_slice)
     # insert some noise
     test_data_slice += (1e-3)*np.random.rand(np.shape(test_data_slice)[0],np.shape(test_data_slice)[1])
     test_variance_slice += (1e-3)*np.random.rand(np.shape(test_variance_slice)[0],np.shape(test_variance_slice)[1])
-
+    '''
+    
     #import ipdb; ipdb.set_trace()
 
 
@@ -102,7 +105,7 @@ if __name__ == "__main__":
     
         
 
-    import ipdb; ipdb.set_trace()
+    #import ipdb; ipdb.set_trace()
     # extract the spectra and put them into dictionary
     eta_flux = basic_fcns.extract_spectra(x_extent=np.shape(test_data_slice)[1], 
                                           y_extent=np.shape(test_data_slice)[0], 
@@ -111,6 +114,9 @@ if __name__ == "__main__":
                                           D=test_data_slice, 
                                           array_variance=test_variance_slice)
 
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print("Execution time:", execution_time, "seconds")
 
     for i in range(0,len(eta_flux)):
         plt.plot(eta_flux[str(i)])
