@@ -3,7 +3,7 @@ import subprocess
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
-from modules import test_functions
+from modules import functions
 
 def run_command_1():
     command = ["echo", "command_1"]
@@ -14,7 +14,7 @@ def run_command_2():
     subprocess.run(command)
 
 def run_command_3():
-    test_functions.the_fcn()
+    functions.the_fcn()
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--no-window", action="store_true", help="Do not display the window")

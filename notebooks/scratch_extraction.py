@@ -4,6 +4,7 @@ from utils import fcns, backbone_classes
 import time
 import configparser
 
+## ## TBD: make clearer distinction between length of spectra, and that of extraction profile
 
 if __name__ == "__main__":
 
@@ -32,8 +33,6 @@ if __name__ == "__main__":
     test_data_slice = test_frame[0,:,:]
     test_variance_slice = test_frame[1,:,:]
 
-    #import ipdb; ipdb.set_trace()
-
     # fake data: spectra which are the same as the profiles
     '''
     test_frame = fcns.read_fits_file('test_array.fits')
@@ -45,10 +44,10 @@ if __name__ == "__main__":
     '''
 
     # initialize basic spectrum object which contains spectra info
-    spec_obj = backbone_classes.SpecData(num_spec = len(abs_pos_00), len_spec = 200)
+    spec_obj = backbone_classes.SpecData(num_spec = len(abs_pos_00), len_spec = np.shape(test_data_slice)[1])
 
     # instantiate extraction machinery
-    extractor_instance = backbone_classes.Extractor(num_spec = len(abs_pos_00), len_spec = 200)
+    extractor_instance = backbone_classes.Extractor(num_spec = len(abs_pos_00), len_spec = np.shape(test_data_slice)[1])
     # generate a profile for each spectrum, and put into the spec_obj
     spec_obj.dict_profiles = extractor_instance.stacked_profiles(array_shape=np.shape(test_data_slice), abs_pos=abs_pos_00)
 
@@ -70,12 +69,12 @@ if __name__ == "__main__":
                                           D=test_data_slice, 
                                           array_variance=test_variance_slice)
     '''
-    print(type(eta_flux))
+    print(type(spec_obj.spec_flux))
     end_time = time.time()
     execution_time = end_time - start_time
     print("Execution time:", execution_time, "seconds")
 
-    for i in range(0,len(eta_flux)):
-        plt.plot(eta_flux[str(i)])
+    for i in range(0,len(spec_obj.spec_flux)):
+        plt.plot(spec_obj.spec_flux[str(i)])
         plt.show()
 
