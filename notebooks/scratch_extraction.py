@@ -26,7 +26,8 @@ if __name__ == "__main__":
     # spectrum starting positions (absolute coordinates, arbit. number of spectra)
     abs_pos_00 = {'0':(0,177),
         '1':(0,159),
-        '2':(0,102)}
+        '2':(0,102), 
+        '3':(0,72)}
 
     # true data
     test_frame = fcns.read_fits_file(stem + 'sample_data_3_spec.fits')
@@ -44,31 +45,28 @@ if __name__ == "__main__":
     '''
 
     # initialize basic spectrum object which contains spectra info
-    spec_obj = backbone_classes.SpecData(num_spec = len(abs_pos_00), len_spec = np.shape(test_data_slice)[1])
+    spec_obj = backbone_classes.SpecData(num_spec = len(abs_pos_00), 
+                                         len_spec = np.shape(test_data_slice)[1], 
+                                         sample_frame = test_data_slice)
 
     # instantiate extraction machinery
-    extractor_instance = backbone_classes.Extractor(num_spec = len(abs_pos_00), len_spec = np.shape(test_data_slice)[1])
-    # generate a profile for each spectrum, and put into the spec_obj
-    spec_obj.dict_profiles = extractor_instance.stacked_profiles(array_shape=np.shape(test_data_slice), abs_pos=abs_pos_00)
+    extractor = backbone_classes.Extractor(num_spec = len(abs_pos_00), 
+                                           len_spec = np.shape(test_data_slice)[1])
+    
+    # generate a profile for each spectrum, and update the spec_obj with them
+    ## ## TODO: SUBSUME THE test_data_slice INTO THE SPEC_OBJ
+    ## ## TODO: SOME OF THE LENGTHY ARGUMENT LISTS OF THESE FUNCTION CALLS CAN PROBABLY BE PRUNED
+    extractor.stacked_profiles(target_instance=spec_obj,
+                                        abs_pos=abs_pos_00)
 
     import ipdb; ipdb.set_trace()  
 
-    spec_obj.spec_flux = extractor_instance.extract_spectra(x_extent=np.shape(test_data_slice)[1], 
-                                          y_extent=np.shape(test_data_slice)[0],
-                                          eta_flux=spec_obj.spec_flux, 
-                                          dict_profiles=spec_obj.dict_profiles, 
+    # do the actual spectral extraction
+    extractor.extract_spectra(target_instance=spec_obj,
                                           D=test_data_slice, 
                                           array_variance=test_variance_slice)
 
-    '''
-    # extract the spectra and put them into dictionary
-    eta_flux = fcns.extract_spectra(x_extent=np.shape(test_data_slice)[1], 
-                                          y_extent=np.shape(test_data_slice)[0], 
-                                          eta_flux=eta_flux, 
-                                          dict_profiles=dict_profiles, 
-                                          D=test_data_slice, 
-                                          array_variance=test_variance_slice)
-    '''
+
     print(type(spec_obj.spec_flux))
     end_time = time.time()
     execution_time = end_time - start_time
