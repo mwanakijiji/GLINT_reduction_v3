@@ -75,7 +75,8 @@ if __name__ == "__main__":
         # do the actual spectral extraction
         extractor.extract_spectra(target_instance=spec_obj,
                                             D=readout_data, 
-                                            array_variance=readout_variance)
+                                            array_variance=readout_variance, 
+                                            n_rd=0)
 
 
         print(type(spec_obj.spec_flux))
@@ -84,6 +85,8 @@ if __name__ == "__main__":
         print("Execution time:", execution_time, "seconds")
 
         for i in range(0,len(spec_obj.spec_flux)):
-            plt.plot(spec_obj.spec_flux[str(i)])
+            plt.plot(spec_obj.spec_flux[str(i)], label='flux')
+            plt.plot(np.sqrt(spec_obj.vark[str(i)]), label='$\sqrt{\sigma^{2}}$')
+            plt.legend()
             plt.show()
 
