@@ -4,14 +4,17 @@ from scipy.sparse.linalg import lsmr
 
 class SpecData:
 
-    def __init__(self, num_spec, len_spec):
+    def __init__(self, num_spec, len_spec, sample_frame):
         self.num_spec = num_spec # number of spectra to extract
         self.dict_profiles = {} # dict of 2D spectral profiles
         self.wavel_soln = {} # dict of wavelength solns
+        self.sample_frame = sample_frame # an example frame, which will be used for getting dims, etc.
         #self.profiles = {} # profiles of the spectra
 
         # initialize dict to hold the extracted spectra ('eta_flux')
         self.spec_flux = {str(i): np.zeros(len_spec) for i in range(self.num_spec)}
+        # dict to hold the extracted variance ('vark')
+        self.vark = {str(i): np.zeros(len_spec) for i in range(self.num_spec)}
 
         # length of the spectra 
         self.len_spec = len_spec
@@ -109,10 +112,19 @@ class Extractor():
         return array_profile
     
 
-    def stacked_profiles(self, array_shape, abs_pos):
+    def stacked_profiles(self, target_instance, abs_pos):
         '''
         Generates a dictionary of profiles based on (x,y) starting positions of spectra
+
+        Args:
+            target_instance (object): The instance of the Extractor class.
+            abs_pos (dict): A dictionary containing the (x,y) starting positions of spectra.
+
+        Returns:
+            None; the value of variable target_instance.dict_profiles is updated
         '''
+
+        array_shape = np.shape(target_instance.sample_frame)
             
         dict_profiles = {}
         for spec_num in range(0,len(abs_pos)):
@@ -125,27 +137,40 @@ class Extractor():
             # add a little bit of noise for troubleshooting
             #dict_profiles[str(spec_num)] += (1e-3)*np.random.rand(np.shape(dict_profiles[str(spec_num)])[0],np.shape(dict_profiles[str(spec_num)])[1])
 
-        return dict_profiles
+        target_instance.dict_profiles = dict_profiles
+
+        return
     
 
-    def extract_spectra(self, x_extent, y_extent, eta_flux, dict_profiles, D, array_variance):
+    def extract_spectra(self, target_instance, D, array_variance, n_rd=0):
         """
         Extracts the spectra
 
         Args:
+            target_instance (object): The instance to which variables will be modified.
             x_extent (int): The number of columns in the detector.
             y_extent (int): The number of pixels in each column.
             eta_flux (dict): A dictionary to store the extracted eta_flux values.
             dict_profiles (dict): A dictionary containing profiles for each row.
             D (ndarray): The 2D data array
             array_variance (ndarray): The 2D variances array
+            n_rd: amount of read noise
 
         Returns:
             dict: The updated dictionary containing extracted spectra
         """
 
+        # set values of some things based on the target instance
+        x_extent = np.shape(target_instance.sample_frame)[1]
+        y_extent = np.shape(target_instance.sample_frame)[0]
+        eta_flux = target_instance.spec_flux
+        vark = target_instance.vark
+        dict_profiles = target_instance.dict_profiles
+
         # convert dictionary into a numpy array
         dict_profiles_array = np.array(list(dict_profiles.values()))
+
+
 
         # loop over detector cols (which are treated independently)
         for col in range(0, x_extent): 
@@ -155,26 +180,50 @@ class Extractor():
             c_mat = np.zeros((len(eta_flux), len(eta_flux)), dtype='float')
             b_mat = np.zeros((len(eta_flux)), dtype='float')
 
+            # equivalent variables for variance
+            c_mat_prime = np.zeros((len(vark), len(vark)), dtype='float')
+            b_mat_prime = np.zeros((len(vark)), dtype='float')
+
             # loop over pixels in col
             for pix_num in range(0, y_extent):
 
-                # vectorized form of Sharp and Birchall 2010, Eqn. 9 (this is equivalent to a for loop over rows of the c_matrix, enclosing a for loop over all spectra (or, equivalently, across all cols of the c_matrix)
+                # vectorized form of Sharp and Birchall 2010, Eqn. 9 (c_mat is c_kj matrix; b_mat is b_j matrix)
+                # (this is equivalent to a for loop over rows of the c_matrix, enclosing a for loop over all spectra (or, equivalently, across all cols of the c_matrix)
                 c_mat += dict_profiles_array[:, pix_num, col, np.newaxis] * dict_profiles_array[:, pix_num, col, np.newaxis].T / array_variance[pix_num, col]
 
                 # b_mat is just 1D, so use mat_row as index
                 b_mat += D[pix_num, col] * dict_profiles_array[:, pix_num, col] / array_variance[pix_num, col]
 
+                # equivalent expressions for variance, Sharp and Birchall 2010, Eqn. 19 (c_mat_prime is c'_kj matrix; b_mat is b'_j matrix)
+                c_mat_prime += dict_profiles_array[:, pix_num, col, np.newaxis] * dict_profiles_array[:, pix_num, col, np.newaxis].T
+                b_mat_prime += ( array_variance[pix_num, col] - n_rd**2 ) * dict_profiles_array[:, pix_num, col]
+
             # solve for the following transform:
             # x * c_mat = b_mat  -->  c_mat.T * x.T = b_mat.T
+            # we want to solve for x, which is equivalent to spectral flux matrix eta_flux_mat (eta_k in Eqn. 9)
             eta_flux_mat_T, istop, itn, normr, normar, norma, conda, normx = \
                     lsmr(c_mat.transpose(), b_mat.transpose())
             
-            eta_flux_mat =  eta_flux_mat_T.transpose()
+            eta_flux_mat = eta_flux_mat_T.transpose()
             
             for eta_flux_num in range(0, len(eta_flux)):
                 eta_flux[str(eta_flux_num)][col] = eta_flux_mat[eta_flux_num]
 
-        return eta_flux
+            ##########
+            # solve for same transform again, to get the variance (Eqn. 19 in Sharp and Birchall)
+            # x * c_mat_prime = b_mat_prime  -->  c_mat_prime.T * x.T = b_mat_prime.T
+            # (we want to solve for x, which is equivalent to variance matrix var_mat (var_k in Eqn. 9)
+            var_mat_T, istop, itn, normr, normar, norma, conda, normx = \
+                    lsmr(c_mat_prime.transpose(), b_mat_prime.transpose())
+            
+            var_mat = var_mat_T.transpose()
+            
+            for var_num in range(0, len(eta_flux)): # variance vector is same length as the flux vector
+                vark[str(var_num)][col] = var_mat[var_num]
+
+        # update class variables
+        target_instance.spec_flux = eta_flux
+        target_instance.var_spec_flux = vark
 
 '''
 # EXAMPLE

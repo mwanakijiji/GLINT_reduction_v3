@@ -3,6 +3,7 @@ import numpy as np
 import astropy.io.fits as fits
 from scipy.optimize import curve_fit
 from scipy.sparse.linalg import lsmr
+import glob
 
 
 def read_fits_file(file_path):
@@ -125,53 +126,13 @@ def gen_spec_profile(rel_pos, x_shift, y_shift, canvas_array, D, df_wavel_empiri
     return dict_profiles
 
 
-def extract_spectra(x_extent, y_extent, eta_flux, dict_profiles, D, array_variance):
-    """
-    Extracts the spectra
+def file_list_maker(dir_read):
 
-    Args:
-        x_extent (int): The number of columns in the detector.
-        y_extent (int): The number of pixels in each column.
-        eta_flux (dict): A dictionary to store the extracted eta_flux values.
-        dict_profiles (dict): A dictionary containing profiles for each row.
-        D (ndarray): The 2D data array
-        array_variance (ndarray): The 2D variances array
+    # populate list of files to operate on (TBD: make this populate a list based on an XML file, or something)
+    files = glob.glob(dir_read + '*.fits')
 
-    Returns:
-        dict: The updated dictionary containing extracted spectra
-    """
+    return files
 
-    # convert dictionary into a numpy array
-    dict_profiles_array = np.array(list(dict_profiles.values()))
-
-    # loop over detector cols (which are treated independently)
-    for col in range(0, x_extent): 
-        
-        # initialize matrices; we will solve for
-        # c_mat.T * x.T = b_mat.T to get x
-        c_mat = np.zeros((len(eta_flux), len(eta_flux)), dtype='float')
-        b_mat = np.zeros((len(eta_flux)), dtype='float')
-
-        # loop over pixels in col
-        for pix_num in range(0, y_extent):
-
-            # vectorized form of Sharp and Birchall 2010, Eqn. 9 (this is equivalent to a for loop over rows of the c_matrix, enclosing a for loop over all spectra (or, equivalently, across all cols of the c_matrix)
-            c_mat += dict_profiles_array[:, pix_num, col, np.newaxis] * dict_profiles_array[:, pix_num, col, np.newaxis].T / array_variance[pix_num, col]
-
-            # b_mat is just 1D, so use mat_row as index
-            b_mat += D[pix_num, col] * dict_profiles_array[:, pix_num, col] / array_variance[pix_num, col]
-
-        # solve for the following transform:
-        # x * c_mat = b_mat  -->  c_mat.T * x.T = b_mat.T
-        eta_flux_mat_T, istop, itn, normr, normar, norma, conda, normx = \
-                lsmr(c_mat.transpose(), b_mat.transpose())
-        
-        eta_flux_mat =  eta_flux_mat_T.transpose()
-        
-        for eta_flux_num in range(0, len(eta_flux)):
-            eta_flux[str(eta_flux_num)][col] = eta_flux_mat[eta_flux_num]
-
-    return eta_flux
 
 
 def infostack(x_extent, y_extent):
