@@ -80,7 +80,8 @@ if __name__ == "__main__":
                                             array_variance=readout_variance, 
                                             n_rd=0)
         
-        # generate the wavelength solution ## TBD: generalize to multiple wavel solns
+        # generate the wavelength solution
+        # TBD: make this get generated for each calibration flash lamp, not for every file; only apply for every file
         wavel_gen_obj = backbone_classes.GenWavelSoln(num_spec = len(abs_pos_00))
         # fake data; TBD: UPDATE
         test_wavel_basis_data = {'0': {'x_pix_locs': np.linspace(0,100,101),'y_pix_locs': 2.*np.ones(101),'lambda_pass': 140 + 5.1*np.linspace(0,100,101)+2.*np.power(np.linspace(0,100,101),2)},
