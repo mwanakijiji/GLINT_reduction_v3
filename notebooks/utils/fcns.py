@@ -6,6 +6,38 @@ from scipy.sparse.linalg import lsmr
 import glob
 
 
+# initial guesses for wavelength solution polynomial coeffs a,b,c:
+def find_coeffs(x,y,z):
+    '''
+    x: x [pix]
+    y: y [pix]
+    z: wavel
+    '''
+
+    p0 = 1., 1., 1., # initial guess
+    fit_coeffs, cov = curve_fit(wavel_from_func, (x,y), z, p0)
+
+    return fit_coeffs
+
+
+# return wavelength based on a pre-existing polynomial wavelength solution
+## TBD: MAKE A HIGHER-ORDER FIT
+def wavel_from_func(X, a_coeff, b_coeff, f_coeff):
+    '''
+    functional fit to lambda as fcn of (x,y)
+
+    X: (x,y) array
+    a,b,c,d,f: coefficients
+    '''
+
+    x_pass, y_pass = X
+
+    #return a_coeff + b_coeff*x_pass + c_coeff*y_pass + d_coeff*np.multiply(x_pass,y_pass) + f_coeff*np.power(x_pass,2.) + g_coeff*np.power(y_pass,2.)
+
+    # no y-dependency for the moment
+    return a_coeff + b_coeff*x_pass + f_coeff*np.power(x_pass,2.)
+
+
 def read_fits_file(file_path):
     try:
         hdul = fits.open(file_path)

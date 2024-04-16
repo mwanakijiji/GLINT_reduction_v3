@@ -1,30 +1,71 @@
 import numpy as np
 from scipy.optimize import curve_fit
 from scipy.sparse.linalg import lsmr
+from utils import fcns
+
+
 
 class SpecData:
+    # holds info about the spectra being extracted
 
     def __init__(self, num_spec, len_spec, sample_frame):
         self.num_spec = num_spec # number of spectra to extract
         self.dict_profiles = {} # dict of 2D spectral profiles
-        self.wavel_soln = {} # dict of wavelength solns
+
         self.sample_frame = sample_frame # an example frame, which will be used for getting dims, etc.
         #self.profiles = {} # profiles of the spectra
 
         # initialize dict to hold the extracted spectra ('eta_flux')
         self.spec_flux = {str(i): np.zeros(len_spec) for i in range(self.num_spec)}
-        # dict to hold the extracted variance ('vark')
+        # dict to hold the extracted variances ('vark')
         self.vark = {str(i): np.zeros(len_spec) for i in range(self.num_spec)}
+        # dict to hold the extracted spectra pixel x-vals
+        self.spec_x_pix = {str(i): np.zeros(len_spec) for i in range(self.num_spec)}
+        # dict to hold the extracted spectra pixel y-vals
+        self.spec_y_pix = {str(i): np.zeros(len_spec) for i in range(self.num_spec)}
+        # dict to hold the wavelength soln coeffs
+        self.fit_coeffs = {}
+        # dict to hold the mapped wavelength abcissae
+        self.wavel_mapped = {str(i): np.zeros(len_spec) for i in range(self.num_spec)}
 
         # length of the spectra 
         self.len_spec = len_spec
 
-    def rectangle(self):
-        # stub
-        return
+
+class GenWavelSoln:
+    # contains machinery for generating wavelength solution
+
+    def __init__(self, num_spec):
+        self.num_spec = num_spec
+
+    # take input (x,y,lambda) values and do a polynomial fit
+    def gen_wavel_solns(self, wavel_soln_dict, target_instance):
+        '''
+        wavel_soln_dict: dictionary of three arrays of floats:
+        - x_pix_locs: x-locations of empirical spot data on detector (can be fractional)
+        - y_pix_locs: y-locations " " 
+        - lambda_pass: wavelengths corresponding to spots
+
+        target_instance: the instance to which the wavelength solution will be mapped
+        '''
+
+        # for each spectrum, take the (xs, ys, lambdas) and generate coeffs (a,b,c)
+        for i in range(0,self.num_spec):
+
+            x_pix_locs = wavel_soln_dict[str(i)]['x_pix_locs']
+            y_pix_locs = wavel_soln_dict[str(i)]['y_pix_locs']
+            lambda_pass = wavel_soln_dict[str(i)]['lambda_pass']
+
+            # fit coefficients based on (x,y) coords of given spectrum and the set of basis wavelengths
+            fit_coeffs = fcns.find_coeffs(x_pix_locs, y_pix_locs, lambda_pass)
+
+            target_instance.fit_coeffs[str(i)] = fit_coeffs
+
+        return None
 
 
 class Extractor():
+    # contains machinery for doing the extraction
 
     def __init__(self, num_spec, len_spec):
         self.num_spec = num_spec # number of spectra to extract
@@ -44,6 +85,7 @@ class Extractor():
         plt.imshow(array2, origin='lower')
         plt.plot([start_x, start_x, end_x, end_x, start_x], [start_y, end_y, end_y, start_y, start_y], 'r')
         plt.show()
+
 
     # gaussian profile (kind of confusing: coordinates are (lambda, x), instead of (x,y) )
     def gauss1d(self, x_left, len_profile, x_pass, lambda_pass, mu_pass, sigma_pass=1):
@@ -110,6 +152,25 @@ class Extractor():
         array_profile[:,x_left:x_left+len_profile] = np.divide(array_profile[:,x_left:x_left+len_profile],np.sum(array_profile[:,x_left:x_left+len_profile], axis=0))
         
         return array_profile
+    
+
+    def apply_wavel_solns(self, target_instance):
+
+        # fake vals # TBD: UPDATE THIS
+        target_instance.spec_x_pix = {str(i): np.linspace(0,100,target_instance.len_spec) for i in range(self.num_spec)}
+        target_instance.spec_y_pix = {str(i): np.linspace(2.0,2.2,target_instance.len_spec) for i in range(self.num_spec)}
+
+        for i in range(0,self.num_spec):
+
+            a_coeff = target_instance.fit_coeffs[str(i)][0]
+            b_coeff = target_instance.fit_coeffs[str(i)][1]
+            f_coeff = target_instance.fit_coeffs[str(i)][2]
+
+            X = (target_instance.spec_x_pix[str(i)], target_instance.spec_y_pix[str(i)])
+
+            target_instance.wavel_mapped[str(i)] = fcns.wavel_from_func(X, a_coeff, b_coeff, f_coeff)
+
+        return None
     
 
     def stacked_profiles(self, target_instance, abs_pos):
@@ -195,6 +256,7 @@ class Extractor():
                 b_mat += D[pix_num, col] * dict_profiles_array[:, pix_num, col] / array_variance[pix_num, col]
 
                 # equivalent expressions for variance, Sharp and Birchall 2010, Eqn. 19 (c_mat_prime is c'_kj matrix; b_mat is b'_j matrix)
+                # (note we are treating sqrt(var(Di))=sigmai in Sharp and Birchall's notation)
                 c_mat_prime += dict_profiles_array[:, pix_num, col, np.newaxis] * dict_profiles_array[:, pix_num, col, np.newaxis].T
                 b_mat_prime += ( array_variance[pix_num, col] - n_rd**2 ) * dict_profiles_array[:, pix_num, col]
 
