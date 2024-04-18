@@ -84,10 +84,10 @@ if __name__ == "__main__":
         # TBD: make this get generated for each calibration flash lamp, not for every file; only apply for every file
         wavel_gen_obj = backbone_classes.GenWavelSoln(num_spec = len(abs_pos_00))
         # fake data; TBD: UPDATE
-        test_wavel_basis_data = {'0': {'x_pix_locs': np.linspace(0,100,101),'y_pix_locs': 2.*np.ones(101),'lambda_pass': 140 + 5.1*np.linspace(0,100,101)+2.*np.power(np.linspace(0,100,101),2)},
-                                 '1': {'x_pix_locs': np.linspace(0,100,101),'y_pix_locs': 20.*np.ones(101),'lambda_pass': 140 + 5.1*np.linspace(0,100,101)+2.*np.power(np.linspace(0,100,101),2)},
-                                 '2': {'x_pix_locs': np.linspace(0,100,101),'y_pix_locs': 40.*np.ones(101),'lambda_pass': 140 + 5.1*np.linspace(0,100,101)+2.*np.power(np.linspace(0,100,101),2)},
-                                 '3': {'x_pix_locs': np.linspace(0,100,101),'y_pix_locs': 50.*np.ones(101),'lambda_pass': 140 + 5.1*np.linspace(0,100,101)+2.*np.power(np.linspace(0,100,101),2)}
+        test_wavel_basis_data = {'0': {'x_pix_locs': np.linspace(28,282,101),'y_pix_locs': 177.*np.ones(101),'lambda_pass': np.linspace(1.10,1.66,101)},
+                                 '1': {'x_pix_locs': np.linspace(28,282,101),'y_pix_locs': 158.*np.ones(101),'lambda_pass': np.linspace(1.10,1.66,101)},
+                                 '2': {'x_pix_locs': np.linspace(28,282,101),'y_pix_locs': 102.*np.ones(101),'lambda_pass': np.linspace(1.10,1.66,101)},
+                                 '3': {'x_pix_locs': np.linspace(28,282,101),'y_pix_locs': 50.*np.ones(101),'lambda_pass': np.linspace(1.10,1.66,101)}
                                  }
         
         wavel_gen_obj.gen_wavel_solns(wavel_soln_dict = test_wavel_basis_data, target_instance=spec_obj)
@@ -95,14 +95,19 @@ if __name__ == "__main__":
         # apply the wavelength solution
         extractor.apply_wavel_solns(target_instance=spec_obj)
 
+        # write to file
+        extractor.write_to_file(target_instance=spec_obj, file_write='junk.fits')
+
         print(type(spec_obj.spec_flux))
         end_time = time.time()
         execution_time = end_time - start_time
         print("Execution time:", execution_time, "seconds")
 
+        '''
         for i in range(0,len(spec_obj.spec_flux)):
             plt.plot(spec_obj.wavel_mapped[str(i)], spec_obj.spec_flux[str(i)], label='flux')
             plt.plot(spec_obj.wavel_mapped[str(i)], np.sqrt(spec_obj.vark[str(i)]), label='$\sqrt{\sigma^{2}}$')
             plt.legend()
             plt.show()
+        '''
 
