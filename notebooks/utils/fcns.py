@@ -20,6 +20,19 @@ def find_coeffs(x,y,z):
     return fit_coeffs
 
 
+def open_fits_table(file_name, verbose=False):
+
+    hdul = fits.open(file_name)
+
+    if verbose:
+        print(hdul.info())
+        data = hdul[1].data
+        print(data.columns)
+
+    return hdul
+
+
+
 # return wavelength based on a pre-existing polynomial wavelength solution
 ## TBD: MAKE A HIGHER-ORDER FIT
 def wavel_from_func(X, a_coeff, b_coeff, f_coeff):

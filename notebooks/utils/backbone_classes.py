@@ -2,7 +2,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 from scipy.sparse.linalg import lsmr
 from utils import fcns
-
+from astropy.io import fits
 
 
 class SpecData:
@@ -85,6 +85,43 @@ class Extractor():
         plt.imshow(array2, origin='lower')
         plt.plot([start_x, start_x, end_x, end_x, start_x], [start_y, end_y, end_y, start_y, start_y], 'r')
         plt.show()
+
+
+    def write_to_file(self, target_instance, file_write):
+
+        # set column definitions
+        coldefs_flux = fits.ColDefs([ 
+            fits.Column(name=f'spec_{str(i).zfill(2)}_flux', format='D', array=target_instance.spec_flux[str(i)], unit=f'Flux', disp='F8.3')
+            for i in target_instance.spec_flux
+            ])
+        coldefs_var = fits.ColDefs([ 
+            fits.Column(name=f'spec_{str(i).zfill(2)}_var', format='D', array=target_instance.vark[str(i)], unit=f'Flux', disp='F8.3')
+            for i in target_instance.var_spec_flux
+            ])
+        coldefs_wavel = fits.ColDefs([ 
+            fits.Column(name=f'spec_{str(i).zfill(2)}_wavel', format='D', array=target_instance.wavel_mapped[str(i)], unit=f'Wavelength (A)', disp='F8.3')
+            for i in target_instance.var_spec_flux
+            ])
+        coldefs_x_pix = fits.ColDefs([ 
+            fits.Column(name=f'spec_{str(i).zfill(2)}_xpix', format='D', array=target_instance.spec_x_pix[str(i)], unit=f'Pix (x)', disp='F8.3')
+            for i in target_instance.var_spec_flux
+            ])
+        coldefs_y_pix = fits.ColDefs([ 
+            fits.Column(name=f'spec_{str(i).zfill(2)}_ypix', format='D', array=target_instance.spec_y_pix[str(i)], unit=f'Pix (y)', disp='F8.3')
+            for i in target_instance.var_spec_flux
+            ])
+        
+        coldefs_all = coldefs_flux + coldefs_var + coldefs_wavel + coldefs_x_pix + coldefs_y_pix
+
+        table_hdu = fits.BinTableHDU.from_columns(coldefs_all)
+
+        import ipdb; ipdb.set_trace()
+
+        # Write the table HDU to the FITS file
+        table_hdu.writeto(file_write, overwrite=True)
+        print('Wrote ',file_write)
+
+        return None
 
 
     # gaussian profile (kind of confusing: coordinates are (lambda, x), instead of (x,y) )
