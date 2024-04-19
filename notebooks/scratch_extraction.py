@@ -32,6 +32,13 @@ if __name__ == "__main__":
         '1':(0,159),
         '2':(0,102), 
         '3':(0,72)}
+    
+    # fake data; TBD: UPDATE
+    test_wavel_basis_data = {'0': {'x_pix_locs': np.linspace(28,282,101),'y_pix_locs': 177.*np.ones(101),'lambda_pass': np.linspace(1.10,1.66,101)},
+                                '1': {'x_pix_locs': np.linspace(28,282,101),'y_pix_locs': 158.*np.ones(101),'lambda_pass': np.linspace(1.10,1.66,101)},
+                                '2': {'x_pix_locs': np.linspace(28,282,101),'y_pix_locs': 102.*np.ones(101),'lambda_pass': np.linspace(1.10,1.66,101)},
+                                '3': {'x_pix_locs': np.linspace(28,282,101),'y_pix_locs': 50.*np.ones(101),'lambda_pass': np.linspace(1.10,1.66,101)}
+                                }
 
     # a sample frame (to get dims etc.)
     stem = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/data/sample_data/'
@@ -51,6 +58,17 @@ if __name__ == "__main__":
 
     # retrieve list of files to operate on
     file_list = fcns.file_list_maker(dir_spectra_read)
+
+    # generate the basis wavelength solution
+    # TBD: make this get generated for each calibration flash lamp, not for every file; only apply for every file
+    wavel_gen_obj = backbone_classes.GenWavelSoln(num_spec = len(abs_pos_00), 
+                                                  dir_read = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/data/wavel_3PL_basis_data/', 
+                                                  wavel_array = np.array([1020, 1060, 1100, 1140, 1180, 1220, 1260, 1300, 1360, 1380, 1420, 1460, 1500, 1540, 1580, 1620, 1660, 1700, 1740]))
+
+    basis_cube = wavel_gen_obj.make_basis_cube()
+
+    wavel_gen_obj.find_xy_narrowbands(basis_cube = basis_cube)
+
 
     # loop over all data files
     for file_num in range(0,len(file_list)):
@@ -80,17 +98,7 @@ if __name__ == "__main__":
                                             array_variance=readout_variance, 
                                             n_rd=0)
         
-        # generate the wavelength solution
-        # TBD: make this get generated for each calibration flash lamp, not for every file; only apply for every file
-        wavel_gen_obj = backbone_classes.GenWavelSoln(num_spec = len(abs_pos_00))
-        # fake data; TBD: UPDATE
-        test_wavel_basis_data = {'0': {'x_pix_locs': np.linspace(28,282,101),'y_pix_locs': 177.*np.ones(101),'lambda_pass': np.linspace(1.10,1.66,101)},
-                                 '1': {'x_pix_locs': np.linspace(28,282,101),'y_pix_locs': 158.*np.ones(101),'lambda_pass': np.linspace(1.10,1.66,101)},
-                                 '2': {'x_pix_locs': np.linspace(28,282,101),'y_pix_locs': 102.*np.ones(101),'lambda_pass': np.linspace(1.10,1.66,101)},
-                                 '3': {'x_pix_locs': np.linspace(28,282,101),'y_pix_locs': 50.*np.ones(101),'lambda_pass': np.linspace(1.10,1.66,101)}
-                                 }
-        
-        wavel_gen_obj.gen_wavel_solns(wavel_soln_dict = test_wavel_basis_data, target_instance=spec_obj)
+        wavel_gen_obj.gen_coeffs(wavel_soln_dict = test_wavel_basis_data, target_instance=spec_obj)
 
         # apply the wavelength solution
         extractor.apply_wavel_solns(target_instance=spec_obj)
@@ -98,7 +106,6 @@ if __name__ == "__main__":
         # write to file
         extractor.write_to_file(target_instance=spec_obj, file_write='junk.fits')
 
-        print(type(spec_obj.spec_flux))
         end_time = time.time()
         execution_time = end_time - start_time
         print("Execution time:", execution_time, "seconds")
