@@ -3,6 +3,10 @@ from scipy.optimize import curve_fit
 from scipy.sparse.linalg import lsmr
 from utils import fcns
 from astropy.io import fits
+import glob
+from photutils.centroids import centroid_sources
+from photutils.centroids import (centroid_1dg, centroid_2dg,
+                                 centroid_com, centroid_quadratic)
 
 
 class SpecData:
@@ -24,7 +28,7 @@ class SpecData:
         # dict to hold the extracted spectra pixel y-vals
         self.spec_y_pix = {str(i): np.zeros(len_spec) for i in range(self.num_spec)}
         # dict to hold the wavelength soln coeffs
-        self.fit_coeffs = {}
+        #self.fit_coeffs = {}
         # dict to hold the mapped wavelength abcissae
         self.wavel_mapped = {str(i): np.zeros(len_spec) for i in range(self.num_spec)}
 
@@ -35,26 +39,72 @@ class SpecData:
 class GenWavelSoln:
     # contains machinery for generating wavelength solution
 
-    def __init__(self, num_spec):
+    def __init__(self, num_spec, dir_read, wavel_array):
         self.num_spec = num_spec
+        self.dir_read = dir_read # directory containing basis set images
+        self.wavel_array = wavel_array # array of wavelengths (any units) in order of sorted filenames
+        self.fit_coeffs = {} # dict to hold the wavelength soln coeffs
+        self.wavel_soln_data = {str(i): {'x_pix_locs': np.zeros(len(wavel_array)),
+                                         'y_pix_locs': np.zeros(len(wavel_array))} for i in range(self.num_spec)} # dict to hold the (x,y) of the wavelength soln basis set
+
+    def make_basis_cube(self):
+
+        file_list = sorted(glob.glob(self.dir_read + '*.fits'))
+        cube = np.stack([fits.getdata(file) for file in file_list], axis=0)
+
+        return cube
+    
+
+    def find_xy_narrowbands(self, xy_guesses, basis_cube):
+        """
+        Find the (x,y) values of points in each narrowband frame.
+
+        Parameters:
+        - xy_guesses: dictionary containing the initial (x,y) guesses for each narrowband frame
+        - basis_cube: 3D numpy array containing the narrowband frames
+
+        Returns:
+        None
+        """
+
+        # loop over spectra
+        for key in xy_guesses:
+
+            for slice_num in range(0,len(basis_cube[:,0,0])):
+
+                data = basis_cube[slice_num,:,:]
+                x, y = centroid_sources(data, 
+                                        xy_guesses[key]['x_guesses'][slice_num], 
+                                        xy_guesses[key]['y_guesses'][slice_num], 
+                                        box_size=5,
+                                centroid_func=centroid_com)
+            
+                self.wavel_soln_data[key]['x_pix_locs'][slice_num] = x
+                self.wavel_soln_data[key]['y_pix_locs'][slice_num] = y
+
+        return None
+
 
     # take input (x,y,lambda) values and do a polynomial fit
-    def gen_wavel_solns(self, wavel_soln_dict, target_instance):
+    def gen_coeffs(self, target_instance):
         '''
-        wavel_soln_dict: dictionary of three arrays of floats:
-        - x_pix_locs: x-locations of empirical spot data on detector (can be fractional)
-        - y_pix_locs: y-locations " " 
-        - lambda_pass: wavelengths corresponding to spots
+        Generate the coefficients for the (x,y,lambda) data
 
         target_instance: the instance to which the wavelength solution will be mapped
         '''
+
+        # wavel_soln_dict: dictionary of three arrays of floats:
+        # - x_pix_locs: x-locations of empirical spot data on detector (can be fractional)
+        # - y_pix_locs: y-locations " " 
+        # - lambda_pass: wavelengths corresponding to spots
+        wavel_soln_dict = self.wavel_soln_data
 
         # for each spectrum, take the (xs, ys, lambdas) and generate coeffs (a,b,c)
         for i in range(0,self.num_spec):
 
             x_pix_locs = wavel_soln_dict[str(i)]['x_pix_locs']
             y_pix_locs = wavel_soln_dict[str(i)]['y_pix_locs']
-            lambda_pass = wavel_soln_dict[str(i)]['lambda_pass']
+            lambda_pass = self.wavel_array
 
             # fit coefficients based on (x,y) coords of given spectrum and the set of basis wavelengths
             fit_coeffs = fcns.find_coeffs(x_pix_locs, y_pix_locs, lambda_pass)
@@ -115,11 +165,10 @@ class Extractor():
 
         table_hdu = fits.BinTableHDU.from_columns(coldefs_all)
 
-        import ipdb; ipdb.set_trace()
-
         # Write the table HDU to the FITS file
         table_hdu.writeto(file_write, overwrite=True)
-        print('Wrote ',file_write)
+        print('---------------------------------------')
+        print('Wrote extracted spectra to',file_write)
 
         return None
 
@@ -191,17 +240,16 @@ class Extractor():
         return array_profile
     
 
-    def apply_wavel_solns(self, target_instance):
-
-        # fake vals # TBD: UPDATE THIS
-        target_instance.spec_x_pix = {str(i): np.linspace(0,100,target_instance.len_spec) for i in range(self.num_spec)}
-        target_instance.spec_y_pix = {str(i): np.linspace(2.0,2.2,target_instance.len_spec) for i in range(self.num_spec)}
+    def apply_wavel_solns(self, source_instance, target_instance):
+        '''
+        Take wavelength fit coefficients from the source_instance, and use them to map wavelengths to target_instance
+        '''
 
         for i in range(0,self.num_spec):
 
-            a_coeff = target_instance.fit_coeffs[str(i)][0]
-            b_coeff = target_instance.fit_coeffs[str(i)][1]
-            f_coeff = target_instance.fit_coeffs[str(i)][2]
+            a_coeff = source_instance.fit_coeffs[str(i)][0]
+            b_coeff = source_instance.fit_coeffs[str(i)][1]
+            f_coeff = source_instance.fit_coeffs[str(i)][2]
 
             X = (target_instance.spec_x_pix[str(i)], target_instance.spec_y_pix[str(i)])
 
@@ -234,6 +282,12 @@ class Extractor():
             
             # add a little bit of noise for troubleshooting
             #dict_profiles[str(spec_num)] += (1e-3)*np.random.rand(np.shape(dict_profiles[str(spec_num)])[0],np.shape(dict_profiles[str(spec_num)])[1])
+
+            # store the (x,y) values of this spectrum
+            ## TBD: improve this later by actually following the spine of the profile
+            ## ... and allow for fractional pixels
+            target_instance.spec_x_pix[str(spec_num)] = np.arange(array_shape[1])
+            target_instance.spec_y_pix[str(spec_num)] = float(abs_pos[str(spec_num)][1]) * np.ones(array_shape[0])
 
         target_instance.dict_profiles = dict_profiles
 

@@ -34,11 +34,13 @@ if __name__ == "__main__":
         '3':(0,72)}
     
     # fake data; TBD: UPDATE
+    '''
     test_wavel_basis_data = {'0': {'x_pix_locs': np.linspace(28,282,101),'y_pix_locs': 177.*np.ones(101),'lambda_pass': np.linspace(1.10,1.66,101)},
                                 '1': {'x_pix_locs': np.linspace(28,282,101),'y_pix_locs': 158.*np.ones(101),'lambda_pass': np.linspace(1.10,1.66,101)},
                                 '2': {'x_pix_locs': np.linspace(28,282,101),'y_pix_locs': 102.*np.ones(101),'lambda_pass': np.linspace(1.10,1.66,101)},
                                 '3': {'x_pix_locs': np.linspace(28,282,101),'y_pix_locs': 50.*np.ones(101),'lambda_pass': np.linspace(1.10,1.66,101)}
                                 }
+    '''
 
     # a sample frame (to get dims etc.)
     stem = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/data/sample_data/'
@@ -67,8 +69,19 @@ if __name__ == "__main__":
 
     basis_cube = wavel_gen_obj.make_basis_cube()
 
-    wavel_gen_obj.find_xy_narrowbands(basis_cube = basis_cube)
+    # guesses of narrowband points in wavelength solution basis set
+    xy_guesses_basis_set = {'0': {'x_guesses': np.array([7.5, 47.6, 80.9, 111, 137, 158, 178, 196, 211, 226, 239, 250, 261, 271, 280, 287, 295, 303, 310]),'y_guesses': 178.*np.ones(19)},
+                          '1': {'x_guesses': np.array([7.5, 47.6, 80.9, 111, 137, 158, 178, 196, 211, 226, 239, 250, 261, 271, 280, 287, 295, 303, 310]),'y_guesses': 159.*np.ones(19)},
+                          '2': {'x_guesses': np.array([7.5, 47.6, 80.9, 111, 137, 158, 178, 196, 211, 226, 239, 250, 261, 271, 280, 287, 295, 303, 310]),'y_guesses': 102.*np.ones(19)},
+                          '3': {'x_guesses': np.array([7.5, 47.6, 80.9, 111, 137, 158, 178, 196, 211, 226, 239, 250, 261, 271, 280, 287, 295, 303, 310]),'y_guesses': 72.*np.ones(19)}
+                          }
 
+    # find (x,y) of narrowband (i.e., point-like) spectra in each frame of basis cube
+    wavel_gen_obj.find_xy_narrowbands(xy_guesses = xy_guesses_basis_set,
+                                      basis_cube = basis_cube)
+    
+    # generate solution coefficients
+    wavel_gen_obj.gen_coeffs(target_instance=wavel_gen_obj)
 
     # loop over all data files
     for file_num in range(0,len(file_list)):
@@ -97,11 +110,9 @@ if __name__ == "__main__":
                                             D=readout_data, 
                                             array_variance=readout_variance, 
                                             n_rd=0)
-        
-        wavel_gen_obj.gen_coeffs(wavel_soln_dict = test_wavel_basis_data, target_instance=spec_obj)
 
         # apply the wavelength solution
-        extractor.apply_wavel_solns(target_instance=spec_obj)
+        extractor.apply_wavel_solns(source_instance=wavel_gen_obj, target_instance=spec_obj)
 
         # write to file
         extractor.write_to_file(target_instance=spec_obj, file_write='junk.fits')
@@ -110,11 +121,11 @@ if __name__ == "__main__":
         execution_time = end_time - start_time
         print("Execution time:", execution_time, "seconds")
 
-        '''
+
         for i in range(0,len(spec_obj.spec_flux)):
             plt.plot(spec_obj.wavel_mapped[str(i)], spec_obj.spec_flux[str(i)], label='flux')
             plt.plot(spec_obj.wavel_mapped[str(i)], np.sqrt(spec_obj.vark[str(i)]), label='$\sqrt{\sigma^{2}}$')
             plt.legend()
             plt.show()
-        '''
+
 
