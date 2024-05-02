@@ -95,7 +95,6 @@ if __name__ == "__main__":
         # retrieve list of data files to operate on (does not include calibration lamps)
         file_list = glob.glob(dir_lamp + '*data*.fits')
 
-
         # loop over all data files
         for file_num in range(0,len(file_list)):
 
@@ -105,10 +104,9 @@ if __name__ == "__main__":
             readout_data = hdul[0].data[0,:,:]
             readout_variance = hdul[0].data[1,:,:]
 
-            # translate the image to align it with the basis lamp
+            # translate the image to align it with the basis lamp (i.e., with the wavelength solns)
             readout_data = shift.shiftnd(readout_data, (-yoff, -xoff))
             readout_variance = shift.shiftnd(readout_variance, (-yoff, -xoff))
-
 
             # initialize basic spectrum object which contains spectra info
             spec_obj = backbone_classes.SpecData(num_spec = len(abs_pos_00), 
@@ -127,7 +125,8 @@ if __name__ == "__main__":
             extractor.extract_spectra(target_instance=spec_obj,
                                                 D=readout_data, 
                                                 array_variance=readout_variance, 
-                                                n_rd=0)
+                                                n_rd=0, 
+                                                fyi_plot=True)
 
             # apply the wavelength solution
             extractor.apply_wavel_solns(source_instance=wavel_gen_obj, target_instance=spec_obj)
@@ -141,6 +140,8 @@ if __name__ == "__main__":
 
 
             for i in range(0,len(spec_obj.spec_flux)):
+
+                # plot the spectra
                 plt.plot(spec_obj.wavel_mapped[str(i)], spec_obj.spec_flux[str(i)], label='flux')
                 plt.plot(spec_obj.wavel_mapped[str(i)], np.sqrt(spec_obj.vark[str(i)]), label='$\sqrt{\sigma^{2}}$')
                 plt.legend()
