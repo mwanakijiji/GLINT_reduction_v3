@@ -7,14 +7,12 @@ import numpy as np
 import scipy
 
 stem = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/data/'
-stem_write = stem + 'fake_data/'
+stem_write = stem + 'fake_data/broadband_lamps/'
 
 # true data
-test_frame = fcns.read_fits_file(stem + 'sample_data_3_spec.fits')
+test_frame = fcns.read_fits_file(stem + 'sample_data/sample_data_3_spec.fits')
 test_data_slice = test_frame[0,:,:]
 test_variance_slice = test_frame[1,:,:]
-
-import ipdb; ipdb.set_trace()
 
 # loop over number of frames to generate
 num_frames = 20
@@ -24,8 +22,14 @@ for i in range(0,num_frames):
     frame_init = test_frame # will be overwritten
     
     # small x,y offsets
+    '''
     xoff = np.random.normal()
     yoff = np.random.normal()
+    '''
+
+    # large x,y offsets
+    xoff = 10.*np.random.normal()
+    yoff = 10.*np.random.normal()
 
     test_data_slice_shifted = scipy.ndimage.shift(test_data_slice, (-yoff, -xoff), mode='nearest')
     test_variance_slice_shifted = scipy.ndimage.shift(test_data_slice, (-yoff, -xoff), mode='nearest')
