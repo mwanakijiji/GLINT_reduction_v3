@@ -5,11 +5,17 @@ import time
 import configparser
 from astropy.io import fits
 import glob
+import image_registration
 from image_registration import chi2_shift
 from image_registration.fft_tools import shift
-import image_registration
 
 ## ## TBD: make clearer distinction between length of spectra, and that of extraction profile
+
+# Requirements:
+# Within a parent directory, put subdirectories with the string 'series' in the name
+# Within each of those subdirectories, put FITS frames which contain in the file name... 
+# ... 'data': these are data frames
+# ... 'broadband': these are the lamp frames (there should just be one of these in each subdirectory)
 
 if __name__ == "__main__":
 
@@ -21,6 +27,8 @@ if __name__ == "__main__":
     dir_spectra_parent = stem + 'fake_data/' # fake data made from real
     # Glob the directories inside the specified directory
     dir_spectra_read = glob.glob(dir_spectra_parent + '*series*/')
+    # directory to which we will write spectral solutions
+    dir_spectra_write = dir_spectra_parent + 'outputs/'
 
     # Read the config file
     config = configparser.ConfigParser()
@@ -56,7 +64,6 @@ if __name__ == "__main__":
     '''
 
     # generate the basis wavelength solution
-    # TBD: make this get generated for each calibration flash lamp, not for every file; only apply for every file
     wavel_gen_obj = backbone_classes.GenWavelSoln(num_spec = len(abs_pos_00), 
                                                   dir_read = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/data/wavel_3PL_basis_data/', 
                                                   wavel_array = np.array([1020, 1060, 1100, 1140, 1180, 1220, 1260, 1300, 1360, 1380, 1420, 1460, 1500, 1540, 1580, 1620, 1660, 1700, 1740]))

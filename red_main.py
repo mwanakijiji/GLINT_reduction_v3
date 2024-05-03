@@ -4,6 +4,8 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 from modules import functions
+from tkinter import filedialog
+import glob
 
 def run_command_1():
     command = ["echo", "command_1"]
@@ -16,6 +18,11 @@ def run_command_2():
 def run_command_3():
     functions.the_fcn()
 
+# Drop-down menu
+def find_directory():
+    directory = filedialog.askdirectory()
+    selected_option.set(directory)
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--no-window", action="store_true", help="Do not display the window")
 args = parser.parse_args()
@@ -27,8 +34,23 @@ if not args.no_window:
     top_row = tk.Frame(window)
     top_row.pack()
 
+
+    selected_option = tk.StringVar()
+    selected_option.set("")
+    display_menu = tk.Label(top_row, textvariable=selected_option)
+    display_menu.pack(side=tk.LEFT)
+
+    find_button = tk.Button(top_row, text="Image Parent Directory", command=find_directory)
+    find_button.pack(side=tk.LEFT)
+
     empty_space_1 = tk.Text(top_row, width=20, height=10)
-    empty_space_1.insert(tk.END, "Placeholder for list of files")
+    def refresh_empty_space_1():
+        directory = selected_option.get()
+        files = glob.glob(directory + "/*")
+        file_list = "\n".join(files)
+        empty_space_1.delete(1.0, tk.END)  # Clear the current content
+        empty_space_1.insert(tk.END, file_list)  # Insert the new content
+    selected_option.trace("w", lambda *args: refresh_empty_space_1())  # Call refresh_empty_space_1 when selected_option changes
     empty_space_1.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
     scrollbar_1 = tk.Scrollbar(top_row, command=empty_space_1.yview)
