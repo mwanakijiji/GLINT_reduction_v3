@@ -2,12 +2,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 from utils import fcns, backbone_classes
 import time
+import os
 import configparser
+from configparser import ExtendedInterpolation
 from astropy.io import fits
 import glob
 import image_registration
 from image_registration import chi2_shift
 from image_registration.fft_tools import shift
+import json
 
 ## ## TBD: make clearer distinction between length of spectra, and that of extraction profile
 
@@ -22,36 +25,39 @@ if __name__ == "__main__":
     start_time = time.time()
 
     # Read the config file
-    config = configparser.ConfigParser()
+    config = configparser.ConfigParser(interpolation=ExtendedInterpolation())
     config.read('config.ini')
 
     stem = config['sys_dirs']['DIR_STEM']
 
     # directory containing files to 'extract'
-    dir_spectra_parent = stem + 'fake_data/' # fake data made from real
+    dir_spectra_parent = config['sys_dirs']['DIR_DATA'] # fake data made from real
     # Glob the directories inside the specified directory
     dir_spectra_read = glob.glob(dir_spectra_parent + '*series*/')
     # directory to which we will write spectral solutions
-    dir_spectra_write = dir_spectra_parent + 'outputs/'
+    dir_spectra_write = config['sys_dirs']['DIR_WRITE']
 
+    # Create the directories if they don't exist
+    os.makedirs(dir_spectra_parent, exist_ok=True)
+    os.makedirs(dir_spectra_write, exist_ok=True)
 
-    # Get the values from the config file
-    #variable1 = config.get('section_name', 'variable1')
-
-    # Use the variables in your code
-    # For example:
-    # stem = variable1
-    # abs_pos_00 = variable2
+    # wavelength configuration stuff
+    with open(config['file_names']['FILE_NAME_WAVELXYGUESS'], 'r') as file:
+        data = json.load(file)
+        xy_guesses_basis_set = data['xy_guesses_basis_set']
+        wavel_array = data['wavel_array']
+        abs_pos_00 = data['abs_pos_00']
 
     # spectrum starting positions in the frame we consider to be the basis (absolute coordinates, arbit. number of spectra)
+    '''
     abs_pos_00 = {'0':(0,177),
         '1':(0,159),
         '2':(0,102), 
         '3':(0,72)}
+    '''
 
     # a sample frame (to get dims etc.)
-    stem = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/data/sample_data/'
-    test_frame = fcns.read_fits_file(stem + 'sample_data_3_spec.fits')
+    test_frame = fcns.read_fits_file(config['file_names']['FILE_NAME_SAMPLE'])
     test_data_slice = test_frame[0,:,:]
     test_variance_slice = test_frame[1,:,:]
 
@@ -65,19 +71,14 @@ if __name__ == "__main__":
     test_variance_slice += (1e-3)*np.random.rand(np.shape(test_variance_slice)[0],np.shape(test_variance_slice)[1])
     '''
 
+
+
     # generate the basis wavelength solution
     wavel_gen_obj = backbone_classes.GenWavelSoln(num_spec = len(abs_pos_00), 
-                                                  dir_read = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/data/wavel_3PL_basis_data/', 
-                                                  wavel_array = np.array([1020, 1060, 1100, 1140, 1180, 1220, 1260, 1300, 1360, 1380, 1420, 1460, 1500, 1540, 1580, 1620, 1660, 1700, 1740]))
+                                                  dir_read = config['sys_dirs']['DIR_WAVEL_DATA'], 
+                                                  wavel_array = np.array(wavel_array))
 
     basis_cube = wavel_gen_obj.make_basis_cube()
-
-    # guesses of narrowband points in wavelength solution basis set
-    xy_guesses_basis_set = {'0': {'x_guesses': np.array([7.5, 47.6, 80.9, 111, 137, 158, 178, 196, 211, 226, 239, 250, 261, 271, 280, 287, 295, 303, 310]),'y_guesses': 178.*np.ones(19)},
-                          '1': {'x_guesses': np.array([7.5, 47.6, 80.9, 111, 137, 158, 178, 196, 211, 226, 239, 250, 261, 271, 280, 287, 295, 303, 310]),'y_guesses': 159.*np.ones(19)},
-                          '2': {'x_guesses': np.array([7.5, 47.6, 80.9, 111, 137, 158, 178, 196, 211, 226, 239, 250, 261, 271, 280, 287, 295, 303, 310]),'y_guesses': 102.*np.ones(19)},
-                          '3': {'x_guesses': np.array([7.5, 47.6, 80.9, 111, 137, 158, 178, 196, 211, 226, 239, 250, 261, 271, 280, 287, 295, 303, 310]),'y_guesses': 72.*np.ones(19)}
-                          }
 
     # find (x,y) of narrowband (i.e., point-like) spectra in each frame of basis cube
     wavel_gen_obj.find_xy_narrowbands(xy_guesses = xy_guesses_basis_set,
@@ -87,9 +88,8 @@ if __name__ == "__main__":
     wavel_gen_obj.gen_coeffs(target_instance=wavel_gen_obj)
 
     # read in a lamp basis image (to find offsets later)
-    wavel_gen_obj.add_basis_image(file_name = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/data/sample_data/sample_data_3_spec.fits')
+    wavel_gen_obj.add_basis_image(file_name = config['file_names']['FILE_NAME_BASISLAMP'])
     
-
     # loop over all groups of calibration lamp / data files
     for dir_lamp in dir_spectra_read:
 
@@ -141,7 +141,8 @@ if __name__ == "__main__":
             extractor.apply_wavel_solns(source_instance=wavel_gen_obj, target_instance=spec_obj)
 
             # write to file
-            extractor.write_to_file(target_instance=spec_obj, file_write='junk.fits')
+            file_name_write = dir_spectra_write + 'extracted_' + os.path.basename(file_list[file_num])
+            extractor.write_to_file(target_instance=spec_obj, file_write = file_name_write)
 
             end_time = time.time()
             execution_time = end_time - start_time
