@@ -21,7 +21,11 @@ if __name__ == "__main__":
 
     start_time = time.time()
 
-    stem = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/data/'
+    # Read the config file
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+
+    stem = config['sys_dirs']['DIR_STEM']
 
     # directory containing files to 'extract'
     dir_spectra_parent = stem + 'fake_data/' # fake data made from real
@@ -30,9 +34,7 @@ if __name__ == "__main__":
     # directory to which we will write spectral solutions
     dir_spectra_write = dir_spectra_parent + 'outputs/'
 
-    # Read the config file
-    config = configparser.ConfigParser()
-    config.read('config.ini')
+
     # Get the values from the config file
     #variable1 = config.get('section_name', 'variable1')
 
@@ -102,7 +104,7 @@ if __name__ == "__main__":
         # retrieve list of data files to operate on (does not include calibration lamps)
         file_list = glob.glob(dir_lamp + '*data*.fits')
 
-        # loop over all data files
+        # loop over all data files corresponding to that calibration lamp
         for file_num in range(0,len(file_list)):
 
             # read in image
@@ -145,7 +147,7 @@ if __name__ == "__main__":
             execution_time = end_time - start_time
             print("Execution time:", execution_time, "seconds")
 
-
+            # loop over all spectra on that detector frame
             for i in range(0,len(spec_obj.spec_flux)):
 
                 # plot the spectra
