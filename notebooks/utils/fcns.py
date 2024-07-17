@@ -34,7 +34,6 @@ def open_fits_table(file_name, verbose=False):
 
 
 # return wavelength based on a pre-existing polynomial wavelength solution
-## TBD: MAKE A HIGHER-ORDER FIT
 def wavel_from_func(X, a_coeff, b_coeff, f_coeff):
     '''
     functional fit to lambda as fcn of (x,y)
@@ -173,7 +172,6 @@ def gen_spec_profile(rel_pos, x_shift, y_shift, canvas_array, D, df_wavel_empiri
 
 def file_list_maker(dir_read):
 
-    # populate list of files to operate on (TBD: make this populate a list based on an XML file, or something)
     files = glob.glob(dir_read + '*.fits')
 
     return files

@@ -11,6 +11,7 @@ import image_registration
 from image_registration import chi2_shift
 from image_registration.fft_tools import shift
 import json
+import time
 
 ## ## TBD: make clearer distinction between length of spectra, and that of extraction profile
 
@@ -79,26 +80,35 @@ if __name__ == "__main__":
 
     # read in a lamp basis image (to find offsets later)
     wavel_gen_obj.add_basis_image(file_name = config['file_names']['FILE_NAME_BASISLAMP'])
+
+    # retrieve lamp image
+    lamp_file_name = glob.glob(config['file_names']['FILE_NAME_THISLAMP'])
+    lamp_data = fits.open(lamp_file_name[0]) # list of files should just have one element
+    lamp_array_this = lamp_data[0].data[0]
+
+    # find offset from lamp basis image
+    xoff, yoff, exoff, eyoff = chi2_shift(wavel_gen_obj.lamp_basis_frame, lamp_array_this)
     
     # loop over all groups of calibration lamp / data files
-    for dir_lamp in dir_spectra_read:
 
-        # retrieve lamp image
-        lamp_file_name = glob.glob(dir_lamp + '*broadband*.fits')
-        lamp_data = fits.open(lamp_file_name[0]) # list of files should just have one element
-        lamp_array_this = lamp_data[0].data[0]
+    # Get the initial list of files in the directory
+    initial_files = os.listdir(dir_spectra_parent)
 
-        # find offset from lamp basis image
-        xoff, yoff, exoff, eyoff = chi2_shift(wavel_gen_obj.lamp_basis_frame, lamp_array_this)
-    
-        # retrieve list of data files to operate on (does not include calibration lamps)
-        file_list = glob.glob(dir_lamp + '*data*.fits')
+    # Start monitoring the directory for new files
+    while True:
+        # Get the current list of files in the directory
+        current_files = os.listdir(dir_spectra_parent)
 
-        # loop over all data files corresponding to that calibration lamp
-        for file_num in range(0,len(file_list)):
+        # Find the new files that have appeared
+        new_files = [file for file in current_files if file not in initial_files]
+
+        # Process the new files
+        for file in new_files:
+            # Construct the full path to the file
+            file_path = os.path.join(dir_spectra_parent, file)
 
             # read in image
-            hdul = fits.open(file_list[file_num])
+            hdul = fits.open(file_path)
 
             readout_data = hdul[0].data[0,:,:]
             readout_variance = hdul[0].data[1,:,:]
@@ -131,7 +141,7 @@ if __name__ == "__main__":
             extractor.apply_wavel_solns(source_instance=wavel_gen_obj, target_instance=spec_obj)
 
             # write to file
-            file_name_write = dir_spectra_write + 'extracted_' + os.path.basename(file_list[file_num])
+            file_name_write = dir_spectra_write + 'extracted_' + os.path.basename(file_path)
             extractor.write_to_file(target_instance=spec_obj, file_write = file_name_write)
 
             end_time = time.time()
@@ -144,7 +154,7 @@ if __name__ == "__main__":
                 for i in range(0,len(spec_obj.spec_flux)):
 
                     # plot the spectra
-                    file_name_plot = config['sys_dirs']['DIR_WRITE_FYI'] + os.path.basename(file_list[file_num]).split('.')[0] + '.png'
+                    file_name_plot = config['sys_dirs']['DIR_WRITE_FYI'] + os.path.basename(file_path).split('.')[0] + '.png'
                     plt.clf()
                     plt.plot(spec_obj.wavel_mapped[str(i)], spec_obj.spec_flux[str(i)], label='flux')
                     plt.plot(spec_obj.wavel_mapped[str(i)], np.sqrt(spec_obj.vark[str(i)]), label='$\sqrt{\sigma^{2}}$')
@@ -152,4 +162,8 @@ if __name__ == "__main__":
                     plt.savefig( file_name_plot )
                     print('Wrote',file_name_plot)
 
+        # Update the initial list of files
+        initial_files = current_files
 
+        # Wait for some time before checking again
+        time.sleep(1)

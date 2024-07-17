@@ -4,6 +4,7 @@ from scipy.sparse.linalg import lsmr
 from utils import fcns
 from astropy.io import fits
 import glob
+import matplotlib.pyplot as plt
 from photutils.centroids import centroid_sources
 from photutils.centroids import (centroid_1dg, centroid_2dg,
                                  centroid_com, centroid_quadratic)
@@ -81,6 +82,14 @@ class GenWavelSoln:
             
                 self.wavel_soln_data[key]['x_pix_locs'][slice_num] = x
                 self.wavel_soln_data[key]['y_pix_locs'][slice_num] = y
+
+        return None
+    
+
+    # read in a lamp basis image
+    def add_basis_image(self, file_name):
+
+        self.lamp_basis_frame = fcns.read_fits_file(file_name)[0]
 
         return None
 
@@ -274,6 +283,8 @@ class Extractor():
             
         dict_profiles = {}
         for spec_num in range(0,len(abs_pos)):
+
+            # these profiles are exactly horizontal
             dict_profiles[str(spec_num)] = self.simple_profile(array_shape = array_shape, 
                                                                     x_left=abs_pos[str(spec_num)][0], 
                                                                     y_left=abs_pos[str(spec_num)][1], 
@@ -294,7 +305,7 @@ class Extractor():
         return
     
 
-    def extract_spectra(self, target_instance, D, array_variance, n_rd=0):
+    def extract_spectra(self, target_instance, D, array_variance, n_rd=0, fyi_plot=False):
         """
         Extracts the spectra
 
@@ -322,7 +333,14 @@ class Extractor():
         # convert dictionary into a numpy array
         dict_profiles_array = np.array(list(dict_profiles.values()))
 
-
+        if fyi_plot:
+            # make a plot showing how the data array and profiles overlap
+            plt.clf()
+            plt.subplot(1, 2, 1)
+            plt.imshow(D/np.max(D), origin='lower')
+            plt.subplot(1, 2, 2)
+            plt.imshow(D/np.max(D) + np.sum(dict_profiles_array, axis=0), origin='lower')
+            plt.show()
 
         # loop over detector cols (which are treated independently)
         for col in range(0, x_extent): 
