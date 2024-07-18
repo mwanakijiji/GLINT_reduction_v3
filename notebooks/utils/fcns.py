@@ -3,8 +3,20 @@ import numpy as np
 import astropy.io.fits as fits
 from scipy.optimize import curve_fit
 from scipy.sparse.linalg import lsmr
+from astropy.convolution import interpolate_replace_nans
 import glob
 
+def fix_bad(array_pass, badpix_pass):
+    '''
+    Fixes bad pixels
+
+    Assumes bad pixel mask has 0: good, 1: bad
+    '''
+    kernel_square = np.ones((3,3)) # correction kernel
+    array_pass[badpix_pass == 1] = np.nan
+    frame_fixed = interpolate_replace_nans(array=array_pass, kernel=kernel_square) # replace nans
+
+    return frame_fixed
 
 # initial guesses for wavelength solution polynomial coeffs a,b,c:
 def find_coeffs(x,y,z):

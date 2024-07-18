@@ -4,6 +4,8 @@ from scipy.sparse.linalg import lsmr
 from utils import fcns
 from astropy.io import fits
 import glob
+import ipdb
+from matplotlib.colors import LogNorm
 import matplotlib.pyplot as plt
 from photutils.centroids import centroid_sources
 from photutils.centroids import (centroid_1dg, centroid_2dg,
@@ -89,7 +91,7 @@ class GenWavelSoln:
     # read in a lamp basis image
     def add_basis_image(self, file_name):
 
-        self.lamp_basis_frame = fcns.read_fits_file(file_name)[0]
+        self.lamp_basis_frame = fcns.read_fits_file(file_name)
 
         return None
 
@@ -338,10 +340,12 @@ class Extractor():
             # make a plot showing how the data array and profiles overlap
             plt.clf()
             plt.subplot(1, 2, 1)
-            plt.imshow(D/np.max(D), origin='lower')
+            plt.imshow(D/np.std(D), norm=LogNorm())
             plt.subplot(1, 2, 2)
-            plt.imshow(D/np.max(D) + np.sum(dict_profiles_array, axis=0), origin='lower')
+            plt.imshow(D/np.std(D) + np.sum(dict_profiles_array, axis=0), norm=LogNorm(vmin=1e-3, vmax=1))
             plt.show()
+
+        #ipdb.set_trace()
 
         # loop over detector cols (which are treated independently)
         for col in range(0, x_extent): 
@@ -396,6 +400,7 @@ class Extractor():
         # update class variables
         target_instance.spec_flux = eta_flux
         target_instance.var_spec_flux = vark
+        #ipdb.set_trace()
 
 '''
 # EXAMPLE
