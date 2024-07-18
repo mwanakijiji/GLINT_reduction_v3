@@ -12,22 +12,15 @@ from image_registration import chi2_shift
 from image_registration.fft_tools import shift
 import json
 import time
+import ipdb
 
 ## ## TBD: make clearer distinction between length of spectra, and that of extraction profile
 
-# Requirements:
-# Within a parent directory, put subdirectories with the string 'series' in the name
-# Within each of those subdirectories, put FITS frames which contain in the file name... 
-# ... 'data': these are data frames
-# ... 'broadband': these are the lamp frames (there should just be one of these in each subdirectory)
-
 if __name__ == "__main__":
-
-    start_time = time.time()
 
     # Read the config file
     config = configparser.ConfigParser(interpolation=ExtendedInterpolation())
-    config.read('config.ini')
+    config.read('config_12_channel_cred2.ini')
 
     # make directories if they don't exist yet
     for key, value in config['sys_dirs'].items():
@@ -41,18 +34,28 @@ if __name__ == "__main__":
     # directory to which we will write spectral solutions
     dir_spectra_write = config['sys_dirs']['DIR_WRITE']
 
-    # wavelength configuration stuff
-    with open(config['file_names']['FILE_NAME_WAVELXYGUESS'], 'r') as file:
+    # wavelength solution stuff
+    with open(config['file_names']['FILE_NAME_PARAMS'], 'r') as file:
         data = json.load(file)
-    
+    # guesses of (x,y) of sampled spots
+    # {"[spec number]": {"x_guesses": [x1, x2, x3, ...], "y_guesses": [y1, y2, y3, ...]
+    # {"wavel_array": [wavelength_nm, wavelength_nm, ...]}
     xy_guesses_basis_set = data['xy_guesses_basis_set'] # array of spots corresponding to narrowband spots
+    # sampled wavelengths 
+    # {"wavel_array": [wavelength_nm, wavelength_nm, ...]}
     wavel_array = data['wavel_array'] # array of sampled wavelengths
-    abs_pos_00 = data['abs_pos_00'] # spectrum starting positions in the frame we consider to be the basis (absolute coordinates, arbit. number of spectra)
+    # spectrum starting positions in the frame we consider to be the basis (absolute coordinates, arbit. number of spectra)
+    # {"[spec number]": [[starting x], [starting y]], ...}
+    abs_pos_00 = data['abs_pos_00']
 
     # a sample frame (to get dims etc.)
     test_frame = fcns.read_fits_file(config['file_names']['FILE_NAME_SAMPLE'])
-    test_data_slice = test_frame[0,:,:]
-    test_variance_slice = test_frame[1,:,:]
+    if len(np.shape(test_frame)) > 2:
+        test_data_slice = test_frame[0,:,:]
+    else:
+        test_data_slice = test_frame
+    if config['sys_dirs']['DIR_PARAMS_DATA']: test_data_slice = np.rot90(test_data_slice, k=1)
+    #test_variance_slice = test_frame[1,:,:]
 
     # fake data for quick checks: uncomment this section to get spectra which are the same as the profiles
     '''
@@ -66,7 +69,7 @@ if __name__ == "__main__":
 
     # generate the basis wavelength solution
     wavel_gen_obj = backbone_classes.GenWavelSoln(num_spec = len(abs_pos_00), 
-                                                  dir_read = config['sys_dirs']['DIR_WAVEL_DATA'], 
+                                                  dir_read = config['sys_dirs']['DIR_PARAMS_DATA'], 
                                                   wavel_array = np.array(wavel_array))
 
     basis_cube = wavel_gen_obj.make_basis_cube()
@@ -80,17 +83,22 @@ if __name__ == "__main__":
 
     # read in a lamp basis image (to find offsets later)
     wavel_gen_obj.add_basis_image(file_name = config['file_names']['FILE_NAME_BASISLAMP'])
+    if config['sys_dirs']['DIR_PARAMS_DATA']: wavel_gen_obj.lamp_basis_frame = np.rot90(wavel_gen_obj.lamp_basis_frame, k=1)
 
     # retrieve lamp image
     lamp_file_name = glob.glob(config['file_names']['FILE_NAME_THISLAMP'])
     lamp_data = fits.open(lamp_file_name[0]) # list of files should just have one element
-    lamp_array_this = lamp_data[0].data[0]
+    lamp_array_this = lamp_data[0].data
+    # rotate image CCW? (to get spectra along x-axis)
+    if config['sys_dirs']['DIR_PARAMS_DATA']: lamp_array_this = np.rot90(lamp_array_this, k=1)
+
+    # retrieve a variance image
+    readout_variance = fits.open(config['file_names']['FILE_NAME_VAR'])[0].data
+    if config['sys_dirs']['DIR_PARAMS_DATA']: readout_variance = np.rot90(readout_variance, k=1)
 
     # find offset from lamp basis image
     xoff, yoff, exoff, eyoff = chi2_shift(wavel_gen_obj.lamp_basis_frame, lamp_array_this)
     
-    # loop over all groups of calibration lamp / data files
-
     # Get the initial list of files in the directory
     initial_files = os.listdir(dir_spectra_parent)
 
@@ -104,15 +112,22 @@ if __name__ == "__main__":
 
         # Process the new files
         for file in new_files:
+            start_time = time.time()
+
             # Construct the full path to the file
             file_path = os.path.join(dir_spectra_parent, file)
 
             # read in image
             hdul = fits.open(file_path)
 
-            readout_data = hdul[0].data[0,:,:]
-            readout_variance = hdul[0].data[1,:,:]
+            if len(np.shape(hdul[0].data)) > 2:
+                readout_data = hdul[0].data[0,:,:]
+            else:
+                readout_data = hdul[0].data
 
+            # rotate image CCW? (to get spectra along x-axis)
+            if config['sys_dirs']['DIR_PARAMS_DATA']: readout_data = np.rot90(readout_data, k=1)
+                
             # translate the image to align it with the basis lamp (i.e., with the wavelength solns)
             readout_data = shift.shiftnd(readout_data, (-yoff, -xoff))
             readout_variance = shift.shiftnd(readout_variance, (-yoff, -xoff))
@@ -121,15 +136,16 @@ if __name__ == "__main__":
             spec_obj = backbone_classes.SpecData(num_spec = len(abs_pos_00), 
                                                 len_spec = np.shape(test_data_slice)[1], 
                                                 sample_frame = test_data_slice)
-
+            
             # instantiate extraction machinery
             extractor = backbone_classes.Extractor(num_spec = len(abs_pos_00),
                                                 len_spec = np.shape(test_data_slice)[1])
             
             # generate a profile for each spectrum, and update the spec_obj with them
             extractor.stacked_profiles(target_instance=spec_obj,
-                                                abs_pos=abs_pos_00)
-
+                                                abs_pos=abs_pos_00,
+                                                sigma=2)
+            
             # do the actual spectral extraction, and update the spec_obj with them
             extractor.extract_spectra(target_instance=spec_obj,
                                                 D=readout_data, 
@@ -149,21 +165,25 @@ if __name__ == "__main__":
             print("Execution time:", execution_time, "seconds")
 
             # loop over all spectra on that detector frame
+            '''
             if config['options']['WRITE_PLOTS']:
 
+                plt.clf()
                 for i in range(0,len(spec_obj.spec_flux)):
 
                     # plot the spectra
                     file_name_plot = config['sys_dirs']['DIR_WRITE_FYI'] + os.path.basename(file_path).split('.')[0] + '.png'
-                    plt.clf()
                     plt.plot(spec_obj.wavel_mapped[str(i)], spec_obj.spec_flux[str(i)], label='flux')
                     plt.plot(spec_obj.wavel_mapped[str(i)], np.sqrt(spec_obj.vark[str(i)]), label='$\sqrt{\sigma^{2}}$')
                     plt.legend()
+                    #import ipdb; ipdb.set_trace()
                     plt.savefig( file_name_plot )
-                    print('Wrote',file_name_plot)
+                print('Wrote',file_name_plot)
+            '''
 
         # Update the initial list of files
         initial_files = current_files
 
         # Wait for some time before checking again
         time.sleep(1)
+

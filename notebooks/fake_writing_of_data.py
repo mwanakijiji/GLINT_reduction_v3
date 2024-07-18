@@ -1,8 +1,14 @@
 import os
 import shutil
 import time
+import os
+import shutil
+from astropy.io import fits
 
 # copies FITS files into another directory, to mimic the writing of real data
+
+'''
+# METHOD 1: Copy single FITS frames from one directory to another
 
 source_dir = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/data/fake_data/escrow'
 destination_dir = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/data/fake_data'
@@ -20,3 +26,37 @@ for file in fits_files:
     time.sleep(5)
 
 print('FITS files copied successfully!')
+
+# Delete each copied file from the destination directory
+for file in fits_files:
+    destination_file = os.path.join(destination_dir, file)
+    os.remove(destination_file)
+    print('Deleted file ', file)
+
+print('Copied files deleted successfully!')
+'''
+
+# METHOD 2: Take one cube of frames, and write individual slices out to another directory
+
+source_file = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/data/sample_data/datacube_12_channels.fits'
+destination_dir = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/data/fake_data'
+
+# Read the FITS file
+hdul = fits.open(source_file)
+data = hdul[0].data
+
+# Loop over each slice in the cube
+for i, slice_data in enumerate(data):
+    # Create the output file name
+    output_file = os.path.join(destination_dir, f'slice_{i}.fits')
+    
+    # Create a new HDU with the slice data
+    hdu = fits.PrimaryHDU(slice_data)
+    
+    # Save the new FITS file
+    hdu.writeto(output_file, overwrite=True)
+    
+    print(f'Slice {i} written to {output_file}')
+    time.sleep(1)
+
+print('All slices written successfully!')

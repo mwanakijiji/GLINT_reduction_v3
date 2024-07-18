@@ -267,13 +267,14 @@ class Extractor():
         return None
     
 
-    def stacked_profiles(self, target_instance, abs_pos):
+    def stacked_profiles(self, target_instance, abs_pos, sigma=1):
         '''
         Generates a dictionary of profiles based on (x,y) starting positions of spectra
 
         Args:
             target_instance (object): The instance of the Extractor class.
             abs_pos (dict): A dictionary containing the (x,y) starting positions of spectra.
+            sigma (float, optional): The standard deviation of the Gaussian profile, in pixel units. Defaults to 1.
 
         Returns:
             None; the value of variable target_instance.dict_profiles is updated
@@ -289,7 +290,7 @@ class Extractor():
                                                                     x_left=abs_pos[str(spec_num)][0], 
                                                                     y_left=abs_pos[str(spec_num)][1], 
                                                                     len_profile=self.len_spec, 
-                                                                    sigma_pass=1)
+                                                                    sigma_pass=sigma)
             
             # add a little bit of noise for troubleshooting
             #dict_profiles[str(spec_num)] += (1e-3)*np.random.rand(np.shape(dict_profiles[str(spec_num)])[0],np.shape(dict_profiles[str(spec_num)])[1])

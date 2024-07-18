@@ -10,6 +10,7 @@ import glob
 import image_registration
 from image_registration import chi2_shift
 from image_registration.fft_tools import shift
+from matplotlib.colors import LogNorm
 import json
 
 ## ## TBD: make clearer distinction between length of spectra, and that of extraction profile
