@@ -10,6 +10,7 @@ import glob
 import image_registration
 from image_registration import chi2_shift
 from image_registration.fft_tools import shift
+from astropy.convolution import interpolate_replace_nans
 import json
 import time
 import ipdb
@@ -34,6 +35,9 @@ if __name__ == "__main__":
     # directory to which we will write spectral solutions
     dir_spectra_write = config['sys_dirs']['DIR_WRITE']
 
+    # retrieve a bad pixel mask: 
+    badpix_mask = fits.open(config['file_names']['FILE_NAME_BADPIX'])[0].data
+
     # wavelength solution stuff
     with open(config['file_names']['FILE_NAME_PARAMS'], 'r') as file:
         data = json.load(file)
@@ -54,7 +58,7 @@ if __name__ == "__main__":
         test_data_slice = test_frame[0,:,:]
     else:
         test_data_slice = test_frame
-    if config['sys_dirs']['DIR_PARAMS_DATA']: test_data_slice = np.rot90(test_data_slice, k=1)
+    if (config['options']['ROT_LEFT'] == '1'): test_data_slice = np.rot90(test_data_slice, k=1)
     #test_variance_slice = test_frame[1,:,:]
 
     # fake data for quick checks: uncomment this section to get spectra which are the same as the profiles
@@ -83,18 +87,22 @@ if __name__ == "__main__":
 
     # read in a lamp basis image (to find offsets later)
     wavel_gen_obj.add_basis_image(file_name = config['file_names']['FILE_NAME_BASISLAMP'])
-    if config['sys_dirs']['DIR_PARAMS_DATA']: wavel_gen_obj.lamp_basis_frame = np.rot90(wavel_gen_obj.lamp_basis_frame, k=1)
+    if (config['options']['ROT_LEFT'] == '1'): wavel_gen_obj.lamp_basis_frame = np.rot90(wavel_gen_obj.lamp_basis_frame, k=1)
 
     # retrieve lamp image
     lamp_file_name = glob.glob(config['file_names']['FILE_NAME_THISLAMP'])
     lamp_data = fits.open(lamp_file_name[0]) # list of files should just have one element
     lamp_array_this = lamp_data[0].data
+    lamp_array_this = fcns.fix_bad(array_pass=lamp_array_this, badpix_pass=badpix_mask) # fix bad pixels
+
     # rotate image CCW? (to get spectra along x-axis)
-    if config['sys_dirs']['DIR_PARAMS_DATA']: lamp_array_this = np.rot90(lamp_array_this, k=1)
+    if (config['options']['ROT_LEFT'] == '1'): lamp_array_this = np.rot90(lamp_array_this, k=1)
 
     # retrieve a variance image
+    # (do not fix bad pixels! causes math to fail)
     readout_variance = fits.open(config['file_names']['FILE_NAME_VAR'])[0].data
-    if config['sys_dirs']['DIR_PARAMS_DATA']: readout_variance = np.rot90(readout_variance, k=1)
+
+    if (config['options']['ROT_LEFT'] == '1'): readout_variance = np.rot90(readout_variance, k=1)
 
     # find offset from lamp basis image
     xoff, yoff, exoff, eyoff = chi2_shift(wavel_gen_obj.lamp_basis_frame, lamp_array_this)
@@ -124,13 +132,18 @@ if __name__ == "__main__":
                 readout_data = hdul[0].data[0,:,:]
             else:
                 readout_data = hdul[0].data
+            # make negative numbers zero ## ## TODO: make better badpix mask
+            readout_data[readout_data<0] = 0
+            readout_data = fcns.fix_bad(array_pass=readout_data, badpix_pass=badpix_mask)
 
             # rotate image CCW? (to get spectra along x-axis)
-            if config['sys_dirs']['DIR_PARAMS_DATA']: readout_data = np.rot90(readout_data, k=1)
+            if (config['options']['ROT_LEFT'] == '1'): readout_data = np.rot90(readout_data, k=1)
                 
             # translate the image to align it with the basis lamp (i.e., with the wavelength solns)
             readout_data = shift.shiftnd(readout_data, (-yoff, -xoff))
             readout_variance = shift.shiftnd(readout_variance, (-yoff, -xoff))
+            readout_data[readout_data<0] = 0
+            readout_variance[readout_variance<0] = 0
 
             # initialize basic spectrum object which contains spectra info
             spec_obj = backbone_classes.SpecData(num_spec = len(abs_pos_00), 
@@ -164,22 +177,24 @@ if __name__ == "__main__":
             execution_time = end_time - start_time
             print("Execution time:", execution_time, "seconds")
 
+            # make FYI plots of extracted spectra
             # loop over all spectra on that detector frame
-            '''
-            if config['options']['WRITE_PLOTS']:
+            if (config['options']['WRITE_PLOTS'] == '1'):
 
                 plt.clf()
                 for i in range(0,len(spec_obj.spec_flux)):
 
                     # plot the spectra
                     file_name_plot = config['sys_dirs']['DIR_WRITE_FYI'] + os.path.basename(file_path).split('.')[0] + '.png'
-                    plt.plot(spec_obj.wavel_mapped[str(i)], spec_obj.spec_flux[str(i)], label='flux')
-                    plt.plot(spec_obj.wavel_mapped[str(i)], np.sqrt(spec_obj.vark[str(i)]), label='$\sqrt{\sigma^{2}}$')
+                    if (config['options']['WAVEL_MAP'] == '1'):
+                        plt.plot(spec_obj.wavel_mapped[str(i)], spec_obj.spec_flux[str(i)], label='flux')
+                        plt.plot(spec_obj.wavel_mapped[str(i)], np.sqrt(spec_obj.vark[str(i)]), label='$\sqrt{\sigma^{2}}$')
+                    elif (config['options']['WAVEL_MAP'] == '0'):
+                        plt.plot(spec_obj.spec_flux[str(i)], label='flux')
+                        plt.plot(np.sqrt(spec_obj.vark[str(i)]), label='$\sqrt{\sigma^{2}}$')
                     plt.legend()
-                    #import ipdb; ipdb.set_trace()
-                    plt.savefig( file_name_plot )
+                plt.savefig( file_name_plot )
                 print('Wrote',file_name_plot)
-            '''
 
         # Update the initial list of files
         initial_files = current_files
