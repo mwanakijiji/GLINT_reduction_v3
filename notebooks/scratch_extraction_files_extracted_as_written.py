@@ -192,6 +192,7 @@ if __name__ == "__main__":
 
             # write to file
             file_name_write = dir_spectra_write + 'extracted_' + os.path.basename(file_path)
+            ipdb.set_trace()
             extractor.write_to_file(target_instance=spec_obj, file_write = file_name_write)
 
             time8 = time.time() 
@@ -201,7 +202,6 @@ if __name__ == "__main__":
             execution_time = end_time - start_time
             print("Execution time:", execution_time, "seconds")
             print(time1_d, time2_d, time3_d, time4_d, time5_d, time6_d, time7_d, time8_d)
-            ipdb.set_trace()
 
             # make FYI plots of extracted spectra
             # loop over all spectra on that detector frame
