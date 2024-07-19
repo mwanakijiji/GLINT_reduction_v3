@@ -5,11 +5,48 @@ from utils import fcns
 from astropy.io import fits
 import glob
 import ipdb
+import time
+from multiprocessing import Pool
 from matplotlib.colors import LogNorm
 import matplotlib.pyplot as plt
 from photutils.centroids import centroid_sources
 from photutils.centroids import (centroid_1dg, centroid_2dg,
                                  centroid_com, centroid_quadratic)
+
+
+def worker(variables_to_pass):
+
+    col, eta_flux, vark, dict_profiles_array, D, array_variance, n_rd = variables_to_pass
+
+    c_mat = np.zeros((len(eta_flux), len(eta_flux)), dtype='float')
+    b_mat = np.zeros((len(eta_flux)), dtype='float')
+    c_mat_prime = np.zeros((len(vark), len(vark)), dtype='float')
+    b_mat_prime = np.zeros((len(vark)), dtype='float')
+
+    # loop over rows
+    for pix_num in range(0, D.shape[0]):
+        c_mat += dict_profiles_array[:, pix_num, col, np.newaxis] * dict_profiles_array[:, pix_num, col, np.newaxis].T / array_variance[pix_num, col]
+        b_mat += D[pix_num, col] * dict_profiles_array[:, pix_num, col] / array_variance[pix_num, col]
+        c_mat_prime += dict_profiles_array[:, pix_num, col, np.newaxis] * dict_profiles_array[:, pix_num, col, np.newaxis].T
+        b_mat_prime += (array_variance[pix_num, col] - n_rd**2) * dict_profiles_array[:, pix_num, col]
+
+    eta_flux_mat_T, _, _, _, _, _, _, _ = lsmr(c_mat.transpose(), b_mat.transpose())
+    eta_flux_mat = eta_flux_mat_T.transpose()
+
+    var_mat_T, _, _, _, _, _, _, _ = lsmr(c_mat_prime.transpose(), b_mat_prime.transpose())
+    var_mat = var_mat_T.transpose()
+
+    return col, eta_flux_mat, var_mat
+
+
+def update_results(results, eta_flux, vark):
+    for col, eta_flux_mat, var_mat in results:
+        for eta_flux_num in range(len(eta_flux)):
+            eta_flux[str(eta_flux_num)][col] = eta_flux_mat[eta_flux_num]
+        for var_num in range(len(vark)):
+            vark[str(var_num)][col] = var_mat[var_num]
+
+    return
 
 
 class SpecData:
@@ -157,19 +194,19 @@ class Extractor():
             ])
         coldefs_var = fits.ColDefs([ 
             fits.Column(name=f'spec_{str(i).zfill(2)}_var', format='D', array=target_instance.vark[str(i)], unit=f'Flux', disp='F8.3')
-            for i in target_instance.var_spec_flux
+            for i in target_instance.spec_flux
             ])
         coldefs_wavel = fits.ColDefs([ 
             fits.Column(name=f'spec_{str(i).zfill(2)}_wavel', format='D', array=target_instance.wavel_mapped[str(i)], unit=f'Wavelength (A)', disp='F8.3')
-            for i in target_instance.var_spec_flux
+            for i in target_instance.spec_flux
             ])
         coldefs_x_pix = fits.ColDefs([ 
             fits.Column(name=f'spec_{str(i).zfill(2)}_xpix', format='D', array=target_instance.spec_x_pix[str(i)], unit=f'Pix (x)', disp='F8.3')
-            for i in target_instance.var_spec_flux
+            for i in target_instance.spec_flux
             ])
         coldefs_y_pix = fits.ColDefs([ 
             fits.Column(name=f'spec_{str(i).zfill(2)}_ypix', format='D', array=target_instance.spec_y_pix[str(i)], unit=f'Pix (y)', disp='F8.3')
-            for i in target_instance.var_spec_flux
+            for i in target_instance.spec_flux
             ])
         
         coldefs_all = coldefs_flux + coldefs_var + coldefs_wavel + coldefs_x_pix + coldefs_y_pix
@@ -347,8 +384,40 @@ class Extractor():
 
         #ipdb.set_trace()
 
+        ##### BEGIN MULTIPROCESSING TESTING
+
+        # pack variables other than the column number into an object that can be passed to function with multiprocessing
+        variables_to_pass = [eta_flux, vark, dict_profiles_array, D, array_variance, n_rd]
+
+        import ipdb; ipdb.set_trace()
+
+        ## BEGIN SERIES METHOD
+        '''
+        results = []
+
+        for col_num in range(x_extent):
+            col, eta_flux_mat, var_mat = worker([col_num, *variables_to_pass])
+            results.append([col, eta_flux_mat, var_mat])
+
+        update_results(results, eta_flux, vark)
+        '''
+        ## END SERIES METHOD
+
+
+        pool = Pool()
+        results = pool.map(worker, [(col, *variables_to_pass) for col in range(x_extent)])
+        pool.close()
+        pool.join()
+        update_results(results, eta_flux, vark)
+
+
+        ##### END MULTIPROCESSING TESTING
+
         # loop over detector cols (which are treated independently)
+        '''
         for col in range(0, x_extent): 
+
+            start_time = time.time()
             
             # initialize matrices; we will solve for
             # c_mat.T * x.T = b_mat.T to get x
@@ -358,6 +427,9 @@ class Extractor():
             # equivalent variables for variance
             c_mat_prime = np.zeros((len(vark), len(vark)), dtype='float')
             b_mat_prime = np.zeros((len(vark)), dtype='float')
+
+            time_1 = time.time()
+            time_1d = time_1 - start_time
 
             # loop over pixels in col
             for pix_num in range(0, y_extent):
@@ -374,16 +446,25 @@ class Extractor():
                 c_mat_prime += dict_profiles_array[:, pix_num, col, np.newaxis] * dict_profiles_array[:, pix_num, col, np.newaxis].T
                 b_mat_prime += ( array_variance[pix_num, col] - n_rd**2 ) * dict_profiles_array[:, pix_num, col]
 
+            time_2 = time.time()
+            time_2d = time_2 - time_1
+
             # solve for the following transform:
             # x * c_mat = b_mat  -->  c_mat.T * x.T = b_mat.T
             # we want to solve for x, which is equivalent to spectral flux matrix eta_flux_mat (eta_k in Eqn. 9)
             eta_flux_mat_T, istop, itn, normr, normar, norma, conda, normx = \
                     lsmr(c_mat.transpose(), b_mat.transpose())
             
+            time_3 = time.time()
+            time_3d = time_3 - time_2
+
             eta_flux_mat = eta_flux_mat_T.transpose()
             
             for eta_flux_num in range(0, len(eta_flux)):
                 eta_flux[str(eta_flux_num)][col] = eta_flux_mat[eta_flux_num]
+
+            time_4 = time.time()
+            time_4d = time_4 - time_3
 
             ##########
             # solve for same transform again, to get the variance (Eqn. 19 in Sharp and Birchall)
@@ -392,15 +473,24 @@ class Extractor():
             var_mat_T, istop, itn, normr, normar, norma, conda, normx = \
                     lsmr(c_mat_prime.transpose(), b_mat_prime.transpose())
             
+            time_5 = time.time()
+            time_5d = time_5 - time_4
+            
             var_mat = var_mat_T.transpose()
             
             for var_num in range(0, len(eta_flux)): # variance vector is same length as the flux vector
                 vark[str(var_num)][col] = var_mat[var_num]
 
+            time_6 = time.time()
+            time_6d = time_6 - time_5
+
         # update class variables
         target_instance.spec_flux = eta_flux
         target_instance.var_spec_flux = vark
         #ipdb.set_trace()
+        print('||', time_1d, time_2d, time_3d, time_4d, time_5d, time_6d)
+        ipdb.set_trace()
+        '''
 
 '''
 # EXAMPLE
