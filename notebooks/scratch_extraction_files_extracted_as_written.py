@@ -179,6 +179,7 @@ if __name__ == "__main__":
                                                 D=readout_data, 
                                                 array_variance=readout_variance, 
                                                 n_rd=0, 
+                                                process_method = config['options']['PROCESS_METHOD'],
                                                 fyi_plot=False)
             
             time6 = time.time() 
@@ -192,7 +193,6 @@ if __name__ == "__main__":
 
             # write to file
             file_name_write = dir_spectra_write + 'extracted_' + os.path.basename(file_path)
-            ipdb.set_trace()
             extractor.write_to_file(target_instance=spec_obj, file_write = file_name_write)
 
             time8 = time.time() 
