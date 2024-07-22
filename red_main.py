@@ -36,6 +36,7 @@ args = parser.parse_args()
 
 if not args.no_window:
     window = tk.Tk()
+    window.resizable(True, True)
 
     # Top row
     top_row = tk.Frame(window)
@@ -50,12 +51,16 @@ if not args.no_window:
     find_button = tk.Button(top_row, text="Image Parent Directory", command=find_directory)
     find_button.pack(side=tk.TOP)
 
+    file_names_label = tk.Label(top_row, text="File names")
+    file_names_label.pack(side=tk.TOP)
+    
     empty_space_1 = tk.Text(top_row, width=20, height=10)
     selected_option.trace("w", lambda *args: refresh_empty_space_1())  # Call refresh_empty_space_1 when selected_option changes
     empty_space_1.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
     scrollbar_1 = tk.Scrollbar(top_row, command=empty_space_1.yview)
     empty_space_1.configure(yscrollcommand=scrollbar_1.set)
+    empty_space_1.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
     scrollbar_1.pack(side=tk.RIGHT, fill=tk.Y)
 
     empty_space_2 = tk.Text(top_row, width=20, height=10)
@@ -91,8 +96,16 @@ if not args.no_window:
     bottom_row = tk.Frame(window)
     bottom_row.pack()
 
-    button_1 = tk.Button(bottom_row, text="Command 1", command=run_command_1)
+    button_1 = tk.Button(bottom_row, text="Primitives", command=run_command_1)
     button_1.pack(side=tk.LEFT)
+    # Drop-down menu
+    menu = tk.Menu(window, tearoff=0)
+    menu.add_command(label="Option 1")
+    menu.add_command(label="Option 2")
+    menu.add_command(label="Option 3")
+    def open_menu(event):
+        menu.post(event.x_root, event.y_root)
+    button_1.bind("<Button-1>", open_menu)
 
     button_2 = tk.Button(bottom_row, text="Command 2", command=run_command_2)
     button_2.pack(side=tk.LEFT)
