@@ -29,36 +29,40 @@ def worker(variables_to_pass):
     b_mat_prime = np.zeros((len(vark)), dtype='float')
 
     # loop over rows
-
+    #col =10 ## REMOVE!!
+    '''
     for pix_num in range(0, D.shape[0]):
         c_mat += dict_profiles_array[:, pix_num, col, np.newaxis] * dict_profiles_array[:, pix_num, col, np.newaxis].T / array_variance[pix_num, col]
         b_mat += D[pix_num, col] * dict_profiles_array[:, pix_num, col] / array_variance[pix_num, col]
         c_mat_prime += dict_profiles_array[:, pix_num, col, np.newaxis] * dict_profiles_array[:, pix_num, col, np.newaxis].T
         b_mat_prime += (array_variance[pix_num, col] - n_rd**2) * dict_profiles_array[:, pix_num, col]
-        ipdb.set_trace()
-
+    #ipdb.set_trace()
     '''
+
     #############################
     # BEGIN TESTING
     # Vectorize c_mat update
-    ipdb.set_trace()
+
+    #ipdb.set_trace()
+
     temp_array = dict_profiles_array[:, :, col, np.newaxis] * dict_profiles_array[:, :, col, np.newaxis].T
-    ipdb.set_trace()
-    c_mat = np.sum(temp_array / array_variance[:, col, np.newaxis, np.newaxis], axis=1)
-    ipdb.set_trace()
+    #ipdb.set_trace()
+    c_mat = np.sum(temp_array / array_variance[np.newaxis, :, col, np.newaxis], axis=1)
+    #ipdb.set_trace()
 
     # Vectorize b_mat update
-    b_mat = np.sum(D[:, col, np.newaxis] * dict_profiles_array[:, :, col] / array_variance[:, col, np.newaxis], axis=0)
-    ipdb.set_trace()
+    b_mat = np.sum(D[:, col] * dict_profiles_array[:, :, col] / array_variance[:, col], axis=1)
+    #ipdb.set_trace()
 
     # Vectorize c_mat_prime update (similar to c_mat but without division by array_variance)
     c_mat_prime = np.sum(temp_array, axis=1)
-    ipdb.set_trace()
+    #ipdb.set_trace()
 
     # Vectorize b_mat_prime update
-    b_mat_prime = np.sum((array_variance[:, col] - n_rd**2)[:, np.newaxis] * dict_profiles_array[:, :, col], axis=0)
-    ipdb.set_trace()
-    '''
+    b_mat_prime = np.sum((array_variance[:, col] - n_rd**2)[:, np.newaxis].T * dict_profiles_array[:, :, col], axis=1)
+    #ipdb.set_trace()
+
+
     # END TESTING
     #############################
 
