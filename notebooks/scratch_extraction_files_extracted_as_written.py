@@ -24,9 +24,7 @@ if __name__ == "__main__":
     config.read('config_12_channel_cred2.ini')
 
     # make directories if they don't exist yet
-    for key, value in config['sys_dirs'].items():
-        #directory = os.path.join(stem, value)
-        os.makedirs(value, exist_ok=True)
+    [os.makedirs(value, exist_ok=True) for value in config['sys_dirs'].values()]
 
     # directory containing files to 'extract'
     dir_spectra_parent = config['sys_dirs']['DIR_DATA'] # fake data made from real

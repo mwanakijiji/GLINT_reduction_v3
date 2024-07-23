@@ -50,12 +50,17 @@ data = hdul[0].data
 # Loop over each slice in the cube
 for i, slice_data in enumerate(data):
 
+    '''
+    # for bug-checking
     if i==1:
         slice_data[354:406,119:124] = slice_data[354:406,119:124] + 4000
     elif i==2:
         slice_data[181:205,274:280] = slice_data[181:205,274:280] + 4000
     elif i==3:
         slice_data[195:243,335:340] = slice_data[195:243,335:340] + 4000
+    elif i==4:
+        ipdb.set_trace()
+    '''
 
     # Create the output file name
     output_file = os.path.join(destination_dir, f'slice_{i}.fits')
@@ -68,8 +73,5 @@ for i, slice_data in enumerate(data):
     
     print(f'Slice {i} written to {output_file}')
     time.sleep(1)
-
-    if i==4:
-        ipdb.set_trace()
 
 print('All slices written successfully!')
