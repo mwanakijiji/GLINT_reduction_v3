@@ -18,71 +18,39 @@ from photutils.centroids import (centroid_1dg, centroid_2dg,
 
 def worker(variables_to_pass):
 
-    #time_0 = time.time()
     col, eta_flux, vark, dict_profiles_array, D, array_variance, n_rd = variables_to_pass
-
-    #time_1 = time.time()
-    #time_1_d = time_1-time_0
-    c_mat = np.zeros((len(eta_flux), len(eta_flux)), dtype='float')
-    b_mat = np.zeros((len(eta_flux)), dtype='float')
-    c_mat_prime = np.zeros((len(vark), len(vark)), dtype='float')
-    b_mat_prime = np.zeros((len(vark)), dtype='float')
-
-    # loop over rows
-    #col =10 ## REMOVE!!
-    '''
-    for pix_num in range(0, D.shape[0]):
-        c_mat += dict_profiles_array[:, pix_num, col, np.newaxis] * dict_profiles_array[:, pix_num, col, np.newaxis].T / array_variance[pix_num, col]
-        b_mat += D[pix_num, col] * dict_profiles_array[:, pix_num, col] / array_variance[pix_num, col]
-        c_mat_prime += dict_profiles_array[:, pix_num, col, np.newaxis] * dict_profiles_array[:, pix_num, col, np.newaxis].T
-        b_mat_prime += (array_variance[pix_num, col] - n_rd**2) * dict_profiles_array[:, pix_num, col]
     #ipdb.set_trace()
-    '''
 
-    #############################
-    # BEGIN TESTING
-    # Vectorize c_mat update
+    temp_array = np.matmul(dict_profiles_array[:, :, col, np.newaxis].transpose(1,0,2), dict_profiles_array[:, :, col, np.newaxis].T.transpose(1,0,2)).transpose(1,0,2) # original
+    #temp_array = np.matmul(dict_profiles_array[:, :, col].transpose(1, 0), dict_profiles_array[:, :, col]) # attempt at more efficient; need to debug
 
     #ipdb.set_trace()
 
-    temp_array = dict_profiles_array[:, :, col, np.newaxis] * dict_profiles_array[:, :, col, np.newaxis].T
-    #ipdb.set_trace()
-    c_mat = np.sum(temp_array / array_variance[np.newaxis, :, col, np.newaxis], axis=1)
-    #ipdb.set_trace()
+    c_mat = np.sum(temp_array / array_variance[np.newaxis, :, col, np.newaxis], axis=1) # original
+    #c_mat = np.sum(temp_array / array_variance[:, col, np.newaxis], axis=1)   # attempt at more efficient; need to debug
 
-    # Vectorize b_mat update
     b_mat = np.sum(D[:, col] * dict_profiles_array[:, :, col] / array_variance[:, col], axis=1)
-    #ipdb.set_trace()
 
-    # Vectorize c_mat_prime update (similar to c_mat but without division by array_variance)
     c_mat_prime = np.sum(temp_array, axis=1)
-    #ipdb.set_trace()
 
-    # Vectorize b_mat_prime update
     b_mat_prime = np.sum((array_variance[:, col] - n_rd**2)[:, np.newaxis].T * dict_profiles_array[:, :, col], axis=1)
+
     #ipdb.set_trace()
 
+    try:
+        eta_flux_mat_T, _, _, _ = np.linalg.lstsq(c_mat.T, b_mat.T, rcond=None)
+    except:
+        eta_flux_mat_T = np.nan * np.ones(12)
+    #eta_flux_mat_T, _, _, _, _, _, _, _ = lsmr(c_mat.T, b_mat.T)
+    
+    eta_flux_mat = eta_flux_mat_T.T
 
-    # END TESTING
-    #############################
-
-    #time_2 = time.time()
-    #time_2_d = time_2-time_1
-
-    eta_flux_mat_T, _, _, _, _, _, _, _ = lsmr(c_mat.transpose(), b_mat.transpose())
-    eta_flux_mat = eta_flux_mat_T.transpose()
-    #time_3 = time.time()
-    #time_3_d = time_3-time_2
-
-    var_mat_T, _, _, _, _, _, _, _ = lsmr(c_mat_prime.transpose(), b_mat_prime.transpose())
-    var_mat = var_mat_T.transpose()
-    #time_4 = time.time()
-    #time_4_d = time_4-time_3
-
-    #print('time1_d',time_1_d)
-    #print('time2_d',time_2_d)
-    #print('time3_d',time_3_d)
-    #print('time4_d',time_4_d)
+    try:
+        var_mat_T, _, _, _ = np.linalg.lstsq(c_mat_prime.T, b_mat_prime.T, rcond=None)
+    except:
+        var_mat_T = np.nan * np.ones(12)
+    #var_mat_T, _, _, _, _, _, _, _ = lsmr(c_mat_prime.T, b_mat_prime.T)
+    var_mat = var_mat_T.T
 
     return col, eta_flux_mat, var_mat
 
@@ -355,7 +323,6 @@ class Extractor():
 
         return None
     
-
     def stacked_profiles(self, target_instance, abs_pos, sigma=1):
         '''
         Generates a dictionary of profiles based on (x,y) starting positions of spectra
@@ -439,6 +406,7 @@ class Extractor():
         # pack variables other than the column number into an object that can be passed to function with multiprocessing
         variables_to_pass = [eta_flux, vark, dict_profiles_array, D, array_variance, n_rd]
 
+        # treat the columns in series or in parallel?
         if process_method == 'parallel':    
             time_0 = time.time()
             results = self.pool.map(worker, [(col, *variables_to_pass) for col in range(x_extent)])
@@ -449,44 +417,15 @@ class Extractor():
             print('---------')
             print('Full array time taken:')
             print(time_1 - time_0)
+
         elif process_method == 'series':
             time_0 = time.time()
             results = []
-            for col_num in range(x_extent):
-                col, eta_flux_mat, var_mat = worker([col_num, *variables_to_pass])
-                results.append([col, eta_flux_mat, var_mat])
+
+            # list comprehension over all the columns
+            results = [worker([col, *variables_to_pass]) for col in range(x_extent)]
             update_results(results, eta_flux, vark)
             time_1 = time.time()
             print('---------')
             print('Full array time taken:')
             print(time_1 - time_0)
-
-'''
-# EXAMPLE
-
-# Create an instance of the Extractor class using the test_1_slice variable
-extractor = Extractor(test_data_slice)
-
-# Define the coordinates for the rectangle
-start_x = 30
-start_y = 95
-end_x = 300
-end_y = 110
-
-# Call the rectangle method of the Extractor instance
-extractor.rectangle(start_x, start_y, end_x, end_y)
-
-# Call the sum_along_axis method of the Extractor instance
-sum_along_x = extractor.sum_along_axis(axis=0)
-sum_along_y = extractor.sum_along_axis(axis=1)
-
-# Plot the array with the rectangle
-#extractor.plot_2d_array_with_rectangle(test_data_slice, start_x, start_y, end_x, end_y)
-
-#extractor.plot_1d_array(sum_along_x)
-#extractor.plot_1d_array(sum_along_y)
-
-# Print the results
-print("Sum along x-axis:", sum_along_x)
-print("Sum along y-axis:", sum_along_y)
-'''

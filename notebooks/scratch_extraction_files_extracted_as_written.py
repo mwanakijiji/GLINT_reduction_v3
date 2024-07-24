@@ -14,10 +14,11 @@ from astropy.convolution import interpolate_replace_nans
 import json
 import time
 import ipdb
+import cProfile
 
 ## ## TBD: make clearer distinction between length of spectra, and that of extraction profile
 
-if __name__ == "__main__":
+def main():
 
     # Read the config file
     config = configparser.ConfigParser(interpolation=ExtendedInterpolation())
@@ -198,8 +199,8 @@ if __name__ == "__main__":
 
             end_time = time.time()
             execution_time = end_time - start_time
-            print("Execution time:", execution_time, "seconds")
-            print(time1_d, time2_d, time3_d, time4_d, time5_d, time6_d, time7_d, time8_d)
+            print("Execution time total:", execution_time, "seconds;",time1_d/execution_time, time2_d/execution_time, time3_d/execution_time, time4_d/execution_time, time5_d/execution_time, time6_d/execution_time, time7_d/execution_time, time8_d/execution_time)
+            #print(time1_d, time2_d, time3_d, time4_d, time5_d, time6_d, time7_d, time8_d)
 
             # make FYI plots of extracted spectra
             # loop over all spectra on that detector frame
@@ -226,3 +227,5 @@ if __name__ == "__main__":
         # Wait for some time before checking again
         time.sleep(1)
 
+if __name__ == "__main__":
+    cProfile.run('main()', 'profile_stats.prof')
