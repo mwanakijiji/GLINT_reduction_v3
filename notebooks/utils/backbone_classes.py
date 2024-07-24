@@ -19,15 +19,10 @@ from photutils.centroids import (centroid_1dg, centroid_2dg,
 def worker(variables_to_pass):
 
     col, eta_flux, vark, dict_profiles_array, D, array_variance, n_rd = variables_to_pass
-    #ipdb.set_trace()
 
-    temp_array = np.matmul(dict_profiles_array[:, :, col, np.newaxis].transpose(1,0,2), dict_profiles_array[:, :, col, np.newaxis].T.transpose(1,0,2)).transpose(1,0,2) # original
-    #temp_array = np.matmul(dict_profiles_array[:, :, col].transpose(1, 0), dict_profiles_array[:, :, col]) # attempt at more efficient; need to debug
+    temp_array = np.matmul(dict_profiles_array[:, :, col, np.newaxis].transpose(1,0,2), dict_profiles_array[:, :, col, np.newaxis].T.transpose(1,0,2)).transpose(1,0,2)
 
-    #ipdb.set_trace()
-
-    c_mat = np.sum(temp_array / array_variance[np.newaxis, :, col, np.newaxis], axis=1) # original
-    #c_mat = np.sum(temp_array / array_variance[:, col, np.newaxis], axis=1)   # attempt at more efficient; need to debug
+    c_mat = np.sum(temp_array / array_variance[np.newaxis, :, col, np.newaxis], axis=1)
 
     b_mat = np.sum(D[:, col] * dict_profiles_array[:, :, col] / array_variance[:, col], axis=1)
 
@@ -35,24 +30,15 @@ def worker(variables_to_pass):
 
     b_mat_prime = np.sum((array_variance[:, col] - n_rd**2)[:, np.newaxis].T * dict_profiles_array[:, :, col], axis=1)
 
-    #ipdb.set_trace()
-
     try:
         eta_flux_mat_T, _, _, _ = np.linalg.lstsq(c_mat.T, b_mat.T, rcond=None)
-    except:
-        eta_flux_mat_T = np.nan * np.ones(12)
-    #eta_flux_mat_T, _, _, _, _, _, _, _ = lsmr(c_mat.T, b_mat.T)
-    
-    eta_flux_mat = eta_flux_mat_T.T
-
-    try:
         var_mat_T, _, _, _ = np.linalg.lstsq(c_mat_prime.T, b_mat_prime.T, rcond=None)
     except:
+        # if there is non-convergence (i.e., nans)
+        eta_flux_mat_T = np.nan * np.ones(12)
         var_mat_T = np.nan * np.ones(12)
-    #var_mat_T, _, _, _, _, _, _, _ = lsmr(c_mat_prime.T, b_mat_prime.T)
-    var_mat = var_mat_T.T
 
-    return col, eta_flux_mat, var_mat
+    return col, eta_flux_mat_T.T, var_mat_T.T
 
 
 def update_results(results, eta_flux, vark):
@@ -239,7 +225,7 @@ class Extractor():
         return None
 
 
-    # gaussian profile (kind of confusing: coordinates are (lambda, x), instead of (x,y) )
+    # generate 2D gaussian profile (kind of confusing: coordinates are (lambda, x), instead of (x,y) )
     def gauss1d(self, x_left, len_profile, x_pass, lambda_pass, mu_pass, sigma_pass=1):
         '''
         x_left: x coord of leftmost pixel of spectrum (y coord is assumed to be mu_pass)
@@ -249,24 +235,16 @@ class Extractor():
         mu_pass: profile center (in x_pass coords)
         sigma_pass: profile width (in x_pass coords)
         '''
-        
+
         # condition for lambda axis to be inside footprint
-        lambda_cond = np.logical_and(lambda_pass >= x_left, lambda_pass < x_left+len_profile)
-        
-        #plt.imshow(lambda_cond)
-        #plt.show()
-        
+        lambda_cond = (lambda_pass >= x_left) & (lambda_pass < x_left + len_profile)
+
         # profile spanning entire array
         self.profile = (1./(sigma_pass*np.sqrt(2.*np.pi))) * np.exp(-0.5 * np.power((x_pass-mu_pass)/sigma_pass,2.) )
-        
+
         # mask regions where there is zero signal
-        self.profile *= lambda_cond
-        
-        # normalize columns of nonzero signal
+        self.profile = np.where(lambda_cond, self.profile, 0.)
         self.profile = np.divide(self.profile, np.nanmax(self.profile))
-        
-        # restore regions of zero signal as zeros (instead of False)
-        self.profile[~lambda_cond] = 0.
         
         return self.profile
 
@@ -323,6 +301,7 @@ class Extractor():
 
         return None
     
+
     def stacked_profiles(self, target_instance, abs_pos, sigma=1):
         '''
         Generates a dictionary of profiles based on (x,y) starting positions of spectra
@@ -392,7 +371,7 @@ class Extractor():
         dict_profiles_array = np.array(list(dict_profiles.values()))
 
         # silence warnings about non-convergence
-        warnings.filterwarnings("ignore", category=RuntimeWarning)
+        #warnings.filterwarnings("ignore", category=RuntimeWarning)
 
         if fyi_plot:
             # make a plot showing how the data array and profiles overlap

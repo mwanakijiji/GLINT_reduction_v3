@@ -15,10 +15,15 @@ import json
 import time
 import ipdb
 import cProfile
+import warnings
 
 ## ## TBD: make clearer distinction between length of spectra, and that of extraction profile
 
 def main():
+
+    # silence some warnings
+    os.environ['MKL_DEBUG_CPU_TYPE'] = '5'
+    warnings.filterwarnings("ignore")
 
     # Read the config file
     config = configparser.ConfigParser(interpolation=ExtendedInterpolation())
@@ -138,40 +143,25 @@ def main():
             # rotate image CCW? (to get spectra along x-axis)
             if (config['options']['ROT_LEFT'] == '1'): readout_data = np.rot90(readout_data, k=1)
 
-            time1 = time.time() 
-            time1_d = time1 - start_time
-                
             # translate the image to align it with the basis lamp (i.e., with the wavelength solns)
             readout_data = shift.shiftnd(readout_data, (-yoff, -xoff))
             readout_variance = shift.shiftnd(readout_variance, (-yoff, -xoff))
             readout_data[readout_data<0] = 0
             readout_variance[readout_variance<0] = 0
 
-            time2 = time.time() 
-            time2_d = time2 - time1
-
             # initialize basic spectrum object which contains spectra info
             spec_obj = backbone_classes.SpecData(num_spec = len(abs_pos_00), 
                                                 len_spec = np.shape(test_data_slice)[1], 
                                                 sample_frame = test_data_slice)
-            
-            time3 = time.time() 
-            time3_d = time3 - time2
 
             # instantiate extraction machinery
             extractor = backbone_classes.Extractor(num_spec = len(abs_pos_00),
                                                 len_spec = np.shape(test_data_slice)[1])
             
-            time4 = time.time() 
-            time4_d = time4 - time3
-            
             # generate a profile for each spectrum, and update the spec_obj with them
             extractor.stacked_profiles(target_instance=spec_obj,
                                                 abs_pos=abs_pos_00,
                                                 sigma=2)
-            
-            time5 = time.time() 
-            time5_d = time5 - time4
 
             # do the actual spectral extraction, and update the spec_obj with them
             extractor.extract_spectra(target_instance=spec_obj,
@@ -180,26 +170,17 @@ def main():
                                                 n_rd=0, 
                                                 process_method = config['options']['PROCESS_METHOD'],
                                                 fyi_plot=False)
-            
-            time6 = time.time() 
-            time6_d = time6 - time5
 
             # apply the wavelength solution
             extractor.apply_wavel_solns(source_instance=wavel_gen_obj, target_instance=spec_obj)
-
-            time7 = time.time() 
-            time7_d = time7 - time6
 
             # write to file
             file_name_write = dir_spectra_write + 'extracted_' + os.path.basename(file_path)
             extractor.write_to_file(target_instance=spec_obj, file_write = file_name_write)
 
-            time8 = time.time() 
-            time8_d = time8 - time7
-
             end_time = time.time()
             execution_time = end_time - start_time
-            print("Execution time total:", execution_time, "seconds;",time1_d/execution_time, time2_d/execution_time, time3_d/execution_time, time4_d/execution_time, time5_d/execution_time, time6_d/execution_time, time7_d/execution_time, time8_d/execution_time)
+            print("Execution time total:", execution_time, "seconds")
             #print(time1_d, time2_d, time3_d, time4_d, time5_d, time6_d, time7_d, time8_d)
 
             # make FYI plots of extracted spectra
