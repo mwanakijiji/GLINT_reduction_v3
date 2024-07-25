@@ -18,7 +18,7 @@ from photutils.centroids import (centroid_1dg, centroid_2dg,
 
 def worker(variables_to_pass):
 
-    col, eta_flux, vark, dict_profiles_array, D, array_variance, n_rd = variables_to_pass
+    col, dict_profiles_array, D, array_variance, n_rd = variables_to_pass
 
     temp_array = np.matmul(dict_profiles_array[:, :, col, np.newaxis].transpose(1,0,2), dict_profiles_array[:, :, col, np.newaxis].T.transpose(1,0,2)).transpose(1,0,2)
 
@@ -220,7 +220,7 @@ class Extractor():
             plt.show()
 
         # pack variables other than the column number into an object that can be passed to function with multiprocessing
-        variables_to_pass = [eta_flux, vark, dict_profiles_array, D, array_variance, n_rd]
+        variables_to_pass = [dict_profiles_array, D, array_variance, n_rd]
 
         # treat the columns in series or in parallel?
         if process_method == 'parallel':    
