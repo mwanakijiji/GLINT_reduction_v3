@@ -22,14 +22,21 @@ def worker(variables_to_pass):
 
     temp_array = np.matmul(dict_profiles_array[:, :, col, np.newaxis].transpose(1,0,2), dict_profiles_array[:, :, col, np.newaxis].T.transpose(1,0,2)).transpose(1,0,2)
 
+    # vectorized form of Sharp and Birchall 2010, Eqn. 9 (c_mat is c_kj matrix; b_mat is b_j matrix)
+    # (this is equivalent to a for loop over rows of the c_matrix, enclosing a for loop over all spectra (or, equivalently, across all cols of the c_matrix)
     c_mat = np.sum(temp_array / array_variance[np.newaxis, :, col, np.newaxis], axis=1)
 
+    # b_mat is just 1D
     b_mat = np.sum(D[:, col] * dict_profiles_array[:, :, col] / array_variance[:, col], axis=1)
 
+    # equivalent expressions for variance, Sharp and Birchall 2010, Eqn. 19 (c_mat_prime is c'_kj matrix; b_mat is b'_j matrix)
+    # (note we are treating sqrt(var(Di))=sigmai in Sharp and Birchall's notation)
     c_mat_prime = np.sum(temp_array, axis=1)
-
     b_mat_prime = np.sum((array_variance[:, col] - n_rd**2)[:, np.newaxis].T * dict_profiles_array[:, :, col], axis=1)
 
+    # solve for the following transform:
+    # x * c_mat = b_mat  -->  c_mat.T * x.T = b_mat.T
+    # we want to solve for x, which is equivalent to spectral flux matrix eta_flux_mat (eta_k in Eqn. 9)
     try:
         eta_flux_mat_T, _, _, _ = np.linalg.lstsq(c_mat.T, b_mat.T, rcond=None)
         var_mat_T, _, _, _ = np.linalg.lstsq(c_mat_prime.T, b_mat_prime.T, rcond=None)
@@ -221,6 +228,7 @@ class Extractor():
 
         # pack variables other than the column number into an object that can be passed to function with multiprocessing
         variables_to_pass = [dict_profiles_array, D, array_variance, n_rd]
+        ipdb.set_trace()
 
         # treat the columns in series or in parallel?
         if process_method == 'parallel':    
