@@ -15,6 +15,81 @@ from photutils.centroids import centroid_sources
 from photutils.centroids import (centroid_1dg, centroid_2dg,
                                  centroid_com, centroid_quadratic)
 
+def rearrange_into_big_2d(matrix_input, P):
+
+    N, M = matrix_input.shape
+    # Initialize the larger matrix with zeros
+    larger_matrix = np.zeros((P * N, P * M))
+    
+    # Place matrix_input at the appropriate diagonal positions
+    for i in range(P):
+        start_row = i * N
+        start_col = i * M
+        larger_matrix[start_row:start_row + N, start_col:start_col + M] = matrix_input
+    
+    return larger_matrix
+
+def worker2(variables_to_pass):
+
+    col, dict_profiles_array, D, array_variance, n_rd = variables_to_pass
+
+    # tile everything, for the same data and extraction
+    D_big = rearrange_into_big_2d(matrix_input=D, P=1)
+    array_variance_big = rearrange_into_big_2d(array_variance, P=1)
+    dict_profiles_array_big = rearrange_into_big_2d(dict_profiles_array[0], P=1)
+    ipdb.set_trace()
+
+    
+
+    # Create the diagonal matrix from the inverse of the variances
+    array_variance_inv_big = 1 / array_variance_big
+    # kludge: remove nans (TO DO: improve later)
+    array_variance_inv_big[~np.isfinite(array_variance_inv_big)] = 0.1 * np.nanmedian(array_variance_inv_big)
+
+
+    Aij = np.multiply(dict_profiles_array_big, array_variance_inv_big)
+    c_matrix_big = np.matmul( dict_profiles_array_big.T, Aij )
+
+    Bij = np.multiply(D_big, array_variance_inv_big)
+    b_matrix_big = np.matmul( dict_profiles_array_big.T, Bij )
+    ipdb.set_trace()
+
+    # -------------------
+    # Perform the matrix multiplication
+    '''
+    c_matrix = np.dot(np.dot(dict_profiles_array_big, array_variance_inv), dict_profiles_array_big.T)
+    
+
+    temp_array = np.matmul(dict_profiles_array_big, dict_profiles_array_big.T)
+
+    # vectorized form of Sharp and Birchall 2010, Eqn. 9 (c_mat is c_kj matrix; b_mat is b_j matrix)
+    # (this is equivalent to a for loop over rows of the c_matrix, enclosing a for loop over all spectra (or, equivalently, across all cols of the c_matrix)
+    c_mat = np.sum(temp_array / array_variance[np.newaxis, :, col, np.newaxis], axis=1)
+
+    # b_mat is just 1D; Sharp and Birchall 2010, Eqn. 10
+    b_mat = np.sum(D[:, col] * dict_profiles_array[:, :, col] / array_variance[:, col], axis=1)
+
+    # equivalent expressions for variance, Sharp and Birchall 2010, Eqn. 19 (c_mat_prime is c'_kj matrix; b_mat is b'_j matrix)
+    # (note we are treating sqrt(var(Di))=sigmai in Sharp and Birchall's notation)
+    c_mat_prime = np.sum(temp_array, axis=1)
+    b_mat_prime = np.sum((array_variance[:, col] - n_rd**2)[:, np.newaxis].T * dict_profiles_array[:, :, col], axis=1)
+    '''
+    # solve for the following transform:
+    # x * c_mat = b_mat  -->  c_mat.T * x.T = b_mat.T
+    # we want to solve for x, which is equivalent to spectral flux matrix eta_flux_mat (eta_k in Eqn. 9)
+    try:
+        # solve Sharp and Birchall 2010, Eqn. 11
+        eta_flux_mat_T, _, _, _, _, _, _, _ = scipy.sparse.linalg.lsmr(c_matrix_big.T, b_matrix_big.T)
+        #eta_flux_mat_T, _, _, _ = np.linalg.lstsq(c_matrix_big.T, b_matrix_big.T, rcond=None)
+        # solve Sharp and Birchall 2010, Eqn. 19
+        var_mat_T, _, _, _ = np.linalg.lstsq(c_mat_prime.T, b_mat_prime.T, rcond=None)
+    except:
+        # if there is non-convergence (i.e., nans)
+        eta_flux_mat_T = np.nan * np.ones(12)
+        var_mat_T = np.nan * np.ones(12)
+
+    return col, eta_flux_mat_T.T, var_mat_T.T
+
 
 def worker(variables_to_pass):
 
@@ -26,7 +101,7 @@ def worker(variables_to_pass):
     # (this is equivalent to a for loop over rows of the c_matrix, enclosing a for loop over all spectra (or, equivalently, across all cols of the c_matrix)
     c_mat = np.sum(temp_array / array_variance[np.newaxis, :, col, np.newaxis], axis=1)
 
-    # b_mat is just 1D
+    # b_mat is just 1D; Sharp and Birchall 2010, Eqn. 10
     b_mat = np.sum(D[:, col] * dict_profiles_array[:, :, col] / array_variance[:, col], axis=1)
 
     # equivalent expressions for variance, Sharp and Birchall 2010, Eqn. 19 (c_mat_prime is c'_kj matrix; b_mat is b'_j matrix)
@@ -38,7 +113,9 @@ def worker(variables_to_pass):
     # x * c_mat = b_mat  -->  c_mat.T * x.T = b_mat.T
     # we want to solve for x, which is equivalent to spectral flux matrix eta_flux_mat (eta_k in Eqn. 9)
     try:
+        # solve Sharp and Birchall 2010, Eqn. 11
         eta_flux_mat_T, _, _, _ = np.linalg.lstsq(c_mat.T, b_mat.T, rcond=None)
+        # solve Sharp and Birchall 2010, Eqn. 19
         var_mat_T, _, _, _ = np.linalg.lstsq(c_mat_prime.T, b_mat_prime.T, rcond=None)
     except:
         # if there is non-convergence (i.e., nans)
@@ -228,12 +305,11 @@ class Extractor():
 
         # pack variables other than the column number into an object that can be passed to function with multiprocessing
         variables_to_pass = [dict_profiles_array, D, array_variance, n_rd]
-        ipdb.set_trace()
 
         # treat the columns in series or in parallel?
         if process_method == 'parallel':    
             time_0 = time.time()
-            results = self.pool.map(worker, [(col, *variables_to_pass) for col in range(x_extent)])
+            results = self.pool.map(worker2, [(col, *variables_to_pass) for col in range(x_extent)])
             self.pool.close()
             self.pool.join()
             update_results(results, eta_flux, vark)
@@ -247,7 +323,7 @@ class Extractor():
             results = []
 
             # list comprehension over all the columns
-            results = [worker([col, *variables_to_pass]) for col in range(x_extent)]
+            results = [worker2([col, *variables_to_pass]) for col in range(x_extent)]
             update_results(results, eta_flux, vark)
             time_1 = time.time()
             print('---------')
