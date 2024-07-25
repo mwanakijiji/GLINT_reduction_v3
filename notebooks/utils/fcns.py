@@ -6,6 +6,115 @@ from scipy.sparse.linalg import lsmr
 from astropy.convolution import interpolate_replace_nans
 import glob
 
+def apply_wavel_solns(num_spec, source_instance, target_instance):
+    '''
+    Take wavelength fit coefficients from the source_instance, and use them to map wavelengths to target_instance
+    '''
+
+    for i in range(0,num_spec):
+
+        a_coeff = source_instance.fit_coeffs[str(i)][0]
+        b_coeff = source_instance.fit_coeffs[str(i)][1]
+        f_coeff = source_instance.fit_coeffs[str(i)][2]
+
+        X = (target_instance.spec_x_pix[str(i)], target_instance.spec_y_pix[str(i)])
+
+        target_instance.wavel_mapped[str(i)] = wavel_from_func(X, a_coeff, b_coeff, f_coeff)
+
+    return None
+
+
+def stacked_profiles(target_instance, abs_pos, len_spec, sigma=1):
+    '''
+    Generates a dictionary of profiles based on (x,y) starting positions of spectra
+
+    Args:
+        target_instance (object): The instance of the Extractor class.
+        abs_pos (dict): A dictionary containing the (x,y) starting positions of spectra.
+        sigma (float, optional): The standard deviation of the Gaussian profile, in pixel units. Defaults to 1.
+
+    Returns:
+        None; the value of variable target_instance.dict_profiles is updated
+    '''
+
+    array_shape = np.shape(target_instance.sample_frame)
+        
+    dict_profiles = {}
+    for spec_num in range(0,len(abs_pos)):
+
+        # these profiles are exactly horizontal
+        dict_profiles[str(spec_num)] = simple_profile(array_shape = array_shape, 
+                                                                x_left=abs_pos[str(spec_num)][0], 
+                                                                y_left=abs_pos[str(spec_num)][1], 
+                                                                len_profile=len_spec, 
+                                                                sigma_pass=sigma)
+        
+        # add a little bit of noise for troubleshooting
+        #dict_profiles[str(spec_num)] += (1e-3)*np.random.rand(np.shape(dict_profiles[str(spec_num)])[0],np.shape(dict_profiles[str(spec_num)])[1])
+
+        # store the (x,y) values of this spectrum
+        ## TBD: improve this later by actually following the spine of the profile
+        ## ... and allow for fractional pixels
+        target_instance.spec_x_pix[str(spec_num)] = np.arange(array_shape[1])
+        target_instance.spec_y_pix[str(spec_num)] = float(abs_pos[str(spec_num)][1]) * np.ones(array_shape[0])
+
+    target_instance.dict_profiles = dict_profiles
+
+    return
+
+
+def rectangle(self, start_x, start_y, end_x, end_y):
+    self.rectangle = self.array[start_y:end_y, start_x:end_x]
+
+def sum_along_axis(self, axis):
+    return np.sum(self.rectangle, axis=axis)
+
+def plot_1d_array(self, array1):
+    plt.plot(array1)
+    plt.show()
+
+def plot_2d_array_with_rectangle(self, array2, start_x, start_y, end_x, end_y):
+    plt.imshow(array2, origin='lower')
+    plt.plot([start_x, start_x, end_x, end_x, start_x], [start_y, end_y, end_y, start_y, start_y], 'r')
+    plt.show()
+
+
+def write_to_file(target_instance, file_write):
+
+    # set column definitions
+    coldefs_flux = fits.ColDefs([ 
+        fits.Column(name=f'spec_{str(i).zfill(2)}_flux', format='D', array=target_instance.spec_flux[str(i)], unit=f'Flux', disp='F8.3')
+        for i in target_instance.spec_flux
+        ])
+    coldefs_var = fits.ColDefs([ 
+        fits.Column(name=f'spec_{str(i).zfill(2)}_var', format='D', array=target_instance.vark[str(i)], unit=f'Flux', disp='F8.3')
+        for i in target_instance.spec_flux
+        ])
+    coldefs_wavel = fits.ColDefs([ 
+        fits.Column(name=f'spec_{str(i).zfill(2)}_wavel', format='D', array=target_instance.wavel_mapped[str(i)], unit=f'Wavelength (A)', disp='F8.3')
+        for i in target_instance.spec_flux
+        ])
+    coldefs_x_pix = fits.ColDefs([ 
+        fits.Column(name=f'spec_{str(i).zfill(2)}_xpix', format='D', array=target_instance.spec_x_pix[str(i)], unit=f'Pix (x)', disp='F8.3')
+        for i in target_instance.spec_flux
+        ])
+    coldefs_y_pix = fits.ColDefs([ 
+        fits.Column(name=f'spec_{str(i).zfill(2)}_ypix', format='D', array=target_instance.spec_y_pix[str(i)], unit=f'Pix (y)', disp='F8.3')
+        for i in target_instance.spec_flux
+        ])
+    
+    coldefs_all = coldefs_flux + coldefs_var + coldefs_wavel + coldefs_x_pix + coldefs_y_pix
+
+    table_hdu = fits.BinTableHDU.from_columns(coldefs_all)
+
+    # Write the table HDU to the FITS file
+    table_hdu.writeto(file_write, overwrite=True)
+    print('---------------------------------------')
+    print('Wrote extracted spectra to',file_write)
+
+    return None
+
+
 def fix_bad(array_pass, badpix_pass):
     '''
     Fixes bad pixels
@@ -107,7 +216,7 @@ def gauss1d(x_left, len_spec, x_pass, lambda_pass, mu_pass, sigma_pass=1):
 
 
 # wrapper to make the enclosing profile of a spectrum
-def simple_profile(array_shape, x_left, y_left, len_spec, sigma_pass=1):
+def simple_profile(array_shape, x_left, y_left, len_profile, sigma_pass=1):
     """
     Make one simple 1D Gaussian profile in x-direction
 
@@ -128,14 +237,14 @@ def simple_profile(array_shape, x_left, y_left, len_spec, sigma_pass=1):
     array_profile = np.zeros(array_shape)
 
     xgrid, ygrid = np.meshgrid(np.arange(0,np.shape(array_profile)[1]),np.arange(0,np.shape(array_profile)[0]))
-    array_profile = gauss1d(x_left=x_left, len_spec=len_spec, x_pass=ygrid, lambda_pass=xgrid, mu_pass=y_left, sigma_pass=sigma_pass)
+    array_profile = gauss1d(x_left=x_left, len_spec=len_profile, x_pass=ygrid, lambda_pass=xgrid, mu_pass=y_left, sigma_pass=sigma_pass)
 
     #plt.imshow(array_profile)
     #plt.show()
     
     # normalize it such that the marginalization in x (in (x,lambda) space) is 1
     # (with a perfect Gaussian profile in x this is redundant)
-    array_profile[:,x_left:x_left+len_spec] = np.divide(array_profile[:,x_left:x_left+len_spec],np.sum(array_profile[:,x_left:x_left+len_spec], axis=0))
+    array_profile[:,x_left:x_left+len_profile] = np.divide(array_profile[:,x_left:x_left+len_profile],np.sum(array_profile[:,x_left:x_left+len_profile], axis=0))
     
     return array_profile
 

@@ -159,9 +159,10 @@ def main():
                                                 len_spec = np.shape(test_data_slice)[1])
             
             # generate a profile for each spectrum, and update the spec_obj with them
-            extractor.stacked_profiles(target_instance=spec_obj,
-                                                abs_pos=abs_pos_00,
-                                                sigma=2)
+            fcns.stacked_profiles(target_instance = spec_obj,
+                                                abs_pos = abs_pos_00,
+                                                len_spec = np.shape(test_data_slice)[1],
+                                                sigma = 2)
 
             # do the actual spectral extraction, and update the spec_obj with them
             extractor.extract_spectra(target_instance=spec_obj,
@@ -172,11 +173,13 @@ def main():
                                                 fyi_plot=False)
 
             # apply the wavelength solution
-            extractor.apply_wavel_solns(source_instance=wavel_gen_obj, target_instance=spec_obj)
+            fcns.apply_wavel_solns(num_spec = len(abs_pos_00), 
+                                   source_instance = wavel_gen_obj, 
+                                   target_instance = spec_obj)
 
             # write to file
             file_name_write = dir_spectra_write + 'extracted_' + os.path.basename(file_path)
-            extractor.write_to_file(target_instance=spec_obj, file_write = file_name_write)
+            fcns.write_to_file(target_instance=spec_obj, file_write = file_name_write)
 
             end_time = time.time()
             execution_time = end_time - start_time
