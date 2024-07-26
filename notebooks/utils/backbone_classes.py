@@ -37,52 +37,36 @@ def worker2(variables_to_pass):
     D_big = rearrange_into_big_2d(matrix_input=D, P=1)
     array_variance_big = rearrange_into_big_2d(array_variance, P=1)
     dict_profiles_array_big = rearrange_into_big_2d(dict_profiles_array[0], P=1)
-    ipdb.set_trace()
 
+    phi = dict_profiles_array[:, :, col]
+    D = D[:, col]
+    array_variance_big = array_variance_big[:, col]
+
+    # Compute S^-2
+    S_inv_squared = 1 / array_variance_big  # Shape: (M,) # CORRECT
+
+    # Compute the element-wise product of phi and S^-2
+    phi_S = phi * S_inv_squared  # Shape: (N, M) - broadcasting S_inv_squared across rows
+
+    c_matrix_big = np.dot(phi_S, phi.T)
+
+    # Compute b
+    b_matrix_big = np.dot( phi, np.multiply(D, S_inv_squared) )  # np.matmul works too, since one matrix is 1D # CORRECT
+
+    c_mat_prime = np.dot(phi, phi.T)
+    b_mat_prime = np.dot( phi, (array_variance_big - n_rd**2) )
     
-
-    # Create the diagonal matrix from the inverse of the variances
-    array_variance_inv_big = 1 / array_variance_big
-    # kludge: remove nans (TO DO: improve later)
-    array_variance_inv_big[~np.isfinite(array_variance_inv_big)] = 0.1 * np.nanmedian(array_variance_inv_big)
-
-
-    Aij = np.multiply(dict_profiles_array_big, array_variance_inv_big)
-    c_matrix_big = np.matmul( dict_profiles_array_big.T, Aij )
-
-    Bij = np.multiply(D_big, array_variance_inv_big)
-    b_matrix_big = np.matmul( dict_profiles_array_big.T, Bij )
-    ipdb.set_trace()
-
-    # -------------------
-    # Perform the matrix multiplication
-    '''
-    c_matrix = np.dot(np.dot(dict_profiles_array_big, array_variance_inv), dict_profiles_array_big.T)
-    
-
-    temp_array = np.matmul(dict_profiles_array_big, dict_profiles_array_big.T)
-
-    # vectorized form of Sharp and Birchall 2010, Eqn. 9 (c_mat is c_kj matrix; b_mat is b_j matrix)
-    # (this is equivalent to a for loop over rows of the c_matrix, enclosing a for loop over all spectra (or, equivalently, across all cols of the c_matrix)
-    c_mat = np.sum(temp_array / array_variance[np.newaxis, :, col, np.newaxis], axis=1)
-
-    # b_mat is just 1D; Sharp and Birchall 2010, Eqn. 10
-    b_mat = np.sum(D[:, col] * dict_profiles_array[:, :, col] / array_variance[:, col], axis=1)
-
-    # equivalent expressions for variance, Sharp and Birchall 2010, Eqn. 19 (c_mat_prime is c'_kj matrix; b_mat is b'_j matrix)
-    # (note we are treating sqrt(var(Di))=sigmai in Sharp and Birchall's notation)
-    c_mat_prime = np.sum(temp_array, axis=1)
-    b_mat_prime = np.sum((array_variance[:, col] - n_rd**2)[:, np.newaxis].T * dict_profiles_array[:, :, col], axis=1)
-    '''
     # solve for the following transform:
     # x * c_mat = b_mat  -->  c_mat.T * x.T = b_mat.T
     # we want to solve for x, which is equivalent to spectral flux matrix eta_flux_mat (eta_k in Eqn. 9)
     try:
         # solve Sharp and Birchall 2010, Eqn. 11
-        eta_flux_mat_T, _, _, _, _, _, _, _ = scipy.sparse.linalg.lsmr(c_matrix_big.T, b_matrix_big.T)
+        eta_flux_mat_T = np.linalg.solve(c_matrix_big, b_matrix_big)  # Shape: (M,)
+        var_mat_T = np.linalg.solve(c_mat_prime, b_mat_prime)
+        #eta_flux_mat_T, _, _, _, _, _, _, _ = scipy.sparse.linalg.lsmr(c_matrix_big.T, b_matrix_big.T)
         #eta_flux_mat_T, _, _, _ = np.linalg.lstsq(c_matrix_big.T, b_matrix_big.T, rcond=None)
         # solve Sharp and Birchall 2010, Eqn. 19
-        var_mat_T, _, _, _ = np.linalg.lstsq(c_mat_prime.T, b_mat_prime.T, rcond=None)
+        #var_mat_T, _, _, _ = np.linalg.lstsq(c_mat_prime.T, b_mat_prime.T, rcond=None)
     except:
         # if there is non-convergence (i.e., nans)
         eta_flux_mat_T = np.nan * np.ones(12)
@@ -108,6 +92,8 @@ def worker(variables_to_pass):
     # (note we are treating sqrt(var(Di))=sigmai in Sharp and Birchall's notation)
     c_mat_prime = np.sum(temp_array, axis=1)
     b_mat_prime = np.sum((array_variance[:, col] - n_rd**2)[:, np.newaxis].T * dict_profiles_array[:, :, col], axis=1)
+
+    ipdb.set_trace()
 
     # solve for the following transform:
     # x * c_mat = b_mat  -->  c_mat.T * x.T = b_mat.T
