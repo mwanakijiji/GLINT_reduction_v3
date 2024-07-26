@@ -30,13 +30,22 @@ def rearrange_into_big_2d(matrix_input, P):
     return larger_matrix
 
 def worker2(variables_to_pass):
+    '''
+    Does detector-array-column specific reductions with matrix math
+    '''
 
     col, dict_profiles_array, D, array_variance, n_rd = variables_to_pass
 
     # tile everything, for the same data and extraction
+    '''
     D_big = rearrange_into_big_2d(matrix_input=D, P=1)
     array_variance_big = rearrange_into_big_2d(array_variance, P=1)
     dict_profiles_array_big = rearrange_into_big_2d(dict_profiles_array[0], P=1)
+    '''
+
+    D_big = D
+    array_variance_big = array_variance
+    #dict_profiles_array_big = 
 
     phi = dict_profiles_array[:, :, col]
     D = D[:, col]
@@ -59,14 +68,16 @@ def worker2(variables_to_pass):
     # solve for the following transform:
     # x * c_mat = b_mat  -->  c_mat.T * x.T = b_mat.T
     # we want to solve for x, which is equivalent to spectral flux matrix eta_flux_mat (eta_k in Eqn. 9)
+    #ipdb.set_trace()
     try:
         # solve Sharp and Birchall 2010, Eqn. 11
-        eta_flux_mat_T = np.linalg.solve(c_matrix_big, b_matrix_big)  # Shape: (M,)
-        var_mat_T = np.linalg.solve(c_mat_prime, b_mat_prime)
+        #eta_flux_mat_T = np.linalg.solve(c_matrix_big, b_matrix_big)  # Shape: (M,)
+        #var_mat_T = np.linalg.solve(c_mat_prime, b_mat_prime)
         #eta_flux_mat_T, _, _, _, _, _, _, _ = scipy.sparse.linalg.lsmr(c_matrix_big.T, b_matrix_big.T)
         #eta_flux_mat_T, _, _, _ = np.linalg.lstsq(c_matrix_big.T, b_matrix_big.T, rcond=None)
         # solve Sharp and Birchall 2010, Eqn. 19
-        #var_mat_T, _, _, _ = np.linalg.lstsq(c_mat_prime.T, b_mat_prime.T, rcond=None)
+        eta_flux_mat_T, _, _, _ = np.linalg.lstsq(c_matrix_big.T, b_matrix_big.T, rcond=None)
+        var_mat_T, _, _, _ = np.linalg.lstsq(c_mat_prime.T, b_mat_prime.T, rcond=None)
     except:
         # if there is non-convergence (i.e., nans)
         eta_flux_mat_T = np.nan * np.ones(12)
