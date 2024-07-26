@@ -11,6 +11,7 @@ from multiprocessing import Pool
 from matplotlib.colors import LogNorm
 import matplotlib.pyplot as plt
 import warnings
+from scipy.linalg import lstsq
 from photutils.centroids import centroid_sources
 from photutils.centroids import (centroid_1dg, centroid_2dg,
                                  centroid_com, centroid_quadratic)
@@ -34,7 +35,7 @@ def worker2(variables_to_pass):
     Does detector-array-column specific reductions with matrix math
     '''
 
-    col, dict_profiles_array, D, array_variance, n_rd = variables_to_pass
+    dict_profiles_array, D, array_variance, n_rd = variables_to_pass
 
     # tile everything, for the same data and extraction
 
@@ -57,11 +58,16 @@ def worker2(variables_to_pass):
 
 
     # this chunk works
-    array_variance_big = array_variance
-    #dict_profiles_array_big = 
+    '''
     phi = dict_profiles_array[:, :, col]
     D = D[:, col]
-    array_variance_big = array_variance_big[:, col]
+    array_variance_big = array_variance[:, col]
+    '''
+
+    phi = dict_profiles_array 
+ 
+    array_variance_big = array_variance
+
 
 
     # Compute S^-2
@@ -70,35 +76,55 @@ def worker2(variables_to_pass):
     # Compute the element-wise product of phi and S^-2
     phi_S = phi * S_inv_squared  # Shape: (N, M) - broadcasting S_inv_squared across rows
 
-    c_matrix_big = np.dot( phi_S, phi.T )
+    #c_matrix_big = np.dot( phi_S, phi.T )
+    c_matrix_big = np.einsum('ijk,jlk->ilk', phi_S, np.transpose(phi, (1, 0, 2)))
+    #c_matrix_big = np.dot( phi_S, np.transpose(phi, (1, 0, 2)) )
 
     # Compute b
-    b_matrix_big = np.dot( phi, np.multiply(D, S_inv_squared) )  # np.matmul works too, since one matrix is 1D # CORRECT
+    #b_matrix_big = np.dot( phi, np.multiply(D, S_inv_squared) )  # np.matmul works too, since one matrix is 1D # CORRECT
+    b_matrix_big = np.einsum('ijk,jk->ik', phi, np.multiply(D, S_inv_squared))
 
-    c_mat_prime = np.dot( phi, phi.T )
-    b_mat_prime = np.dot( phi, (array_variance_big - n_rd**2) )
-    
-    # solve for the following transform:
-    # x * c_mat = b_mat  -->  c_mat.T * x.T = b_mat.T
-    # we want to solve for x, which is equivalent to spectral flux matrix eta_flux_mat (eta_k in Eqn. 9)
-    #ipdb.set_trace()
-    try:
-        # solve Sharp and Birchall 2010, Eqn. 11
-        #eta_flux_mat_T = np.linalg.solve(c_matrix_big, b_matrix_big)  # Shape: (M,)
-        #var_mat_T = np.linalg.solve(c_mat_prime, b_mat_prime)
-        #eta_flux_mat_T, _, _, _, _, _, _, _ = scipy.sparse.linalg.lsmr(c_matrix_big.T, b_matrix_big.T)
-        #eta_flux_mat_T, _, _, _ = np.linalg.lstsq(c_matrix_big.T, b_matrix_big.T, rcond=None)
-        # solve Sharp and Birchall 2010, Eqn. 19
-        eta_flux_mat_T, _, _, _ = np.linalg.lstsq(c_matrix_big.T, b_matrix_big.T, rcond=None)
-        var_mat_T, _, _, _ = np.linalg.lstsq(c_mat_prime.T, b_mat_prime.T, rcond=None)
-    except:
-        # if there is non-convergence (i.e., nans)
-        eta_flux_mat_T = np.nan * np.ones(12)
-        var_mat_T = np.nan * np.ones(12)
-    t1 = time.time()
-    #ipdb.set_trace()
 
-    return col, eta_flux_mat_T.T, var_mat_T.T
+    #c_mat_prime = np.dot( phi, phi.T )
+    c_mat_prime = np.einsum('ijk,jlk->ilk', phi, np.transpose(phi, (1, 0, 2)))
+    #b_mat_prime = np.dot( phi, (array_variance_big - n_rd**2) )
+    b_mat_prime = np.einsum('ijk,jk->ik', phi, array_variance_big - n_rd**2)
+
+    # replace non-finite values with a median value to let solution work
+    finite_values_c = c_matrix_big[np.isfinite(c_matrix_big)]
+    median_value_c = np.median(finite_values_c)
+    non_finite_mask_c = ~np.isfinite(c_matrix_big)
+    c_matrix_big[non_finite_mask_c] = median_value_c # Replace non-finite values with the median value
+
+    finite_values_b = b_matrix_big[np.isfinite(b_matrix_big)]
+    median_value_b = np.median(finite_values_b)
+    non_finite_mask_b = ~np.isfinite(b_matrix_big) # mask for the non-finite values
+    b_matrix_big[non_finite_mask_b] = median_value_b # Replace non-finite values with the median value
+
+    # Initialize an array to store the results
+    eta_flux_mat_T_reshaped = np.zeros((12, 512))
+    var_mat_T_reshaped = np.zeros((12, 512))
+
+    # test
+    #eta_flux_mat_T_reshaped = np.linalg.lstsq(c_matrix_big.transpose(2, 0, 1), b_matrix_big.transpose(1, 0))[0].transpose(1, 0)
+    #var_mat_T_reshaped = np.linalg.lstsq(c_mat_prime.transpose(2, 0, 1), b_mat_prime.transpose(1, 0))[0].transpose(1, 0)
+
+    # Iterate over the third dimension
+    for i in range(512):
+        try:
+            # Solve the least squares problem for each slice
+            result_eta, _, _, _ = lstsq(c_matrix_big[:, :, i], b_matrix_big[:, i])
+            result_var, _, _, _ = lstsq(c_mat_prime[:, :, i], b_mat_prime[:, i])
+            # Store the result
+            eta_flux_mat_T_reshaped[:, i] = result_eta
+            var_mat_T_reshaped[:, i] = result_var
+        except:
+            eta_flux_mat_T_reshaped[:, i] = np.nan * np.ones(12)
+            var_mat_T_reshaped[:, i] = np.nan * np.ones(12)
+
+    ### insert var; then move worker2 outside of list comprehension; then time it; then generalize shapes (remove the 12, 512, etc.)
+
+    return eta_flux_mat_T_reshaped, var_mat_T_reshaped
 
 
 def worker(variables_to_pass):
@@ -321,7 +347,7 @@ class Extractor():
         # treat the columns in series or in parallel?
         if process_method == 'parallel':    
             time_0 = time.time()
-            results = self.pool.map(worker2, [(col, *variables_to_pass) for col in range(x_extent)])
+            results = self.pool.map(worker, [(col, *variables_to_pass) for col in range(x_extent)])
             self.pool.close()
             self.pool.join()
             update_results(results, eta_flux, vark)
@@ -335,8 +361,17 @@ class Extractor():
             results = []
 
             # list comprehension over all the columns
-            results = [worker2([col, *variables_to_pass]) for col in range(x_extent)]
+            results = [worker([col, *variables_to_pass]) for col in range(x_extent)]
             update_results(results, eta_flux, vark)
+            time_1 = time.time()
+            print('---------')
+            print('Full array time taken:')
+            print(time_1 - time_0)
+        elif process_method == 'series_worker2':
+            time_0 = time.time()
+
+            # list comprehension over all the columns
+            eta_results, var_results = worker2([*variables_to_pass])
             time_1 = time.time()
             print('---------')
             print('Full array time taken:')
