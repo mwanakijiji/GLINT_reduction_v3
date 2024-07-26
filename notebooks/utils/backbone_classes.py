@@ -37,19 +37,32 @@ def worker2(variables_to_pass):
     col, dict_profiles_array, D, array_variance, n_rd = variables_to_pass
 
     # tile everything, for the same data and extraction
-    '''
-    D_big = rearrange_into_big_2d(matrix_input=D, P=1)
-    array_variance_big = rearrange_into_big_2d(array_variance, P=1)
-    dict_profiles_array_big = rearrange_into_big_2d(dict_profiles_array[0], P=1)
-    '''
 
-    D_big = D
+    ### begin tiling test
+
+    # P>1 doesn't work yet
+    '''
+    D_big = rearrange_into_big_2d(matrix_input=D, P=2)
+    array_variance_big = rearrange_into_big_2d(array_variance, P=2)
+    dict_profiles_array_big = rearrange_into_big_2d(dict_profiles_array[:,:,0], P=2)
+
+    t0 = time.time()
+    phi = dict_profiles_array_big # [:, col]
+    D = D_big[:, col]
+    array_variance_big = array_variance_big[:, col]
+    '''
+    #ipdb.set_trace()
+    ### end tiling test
+
+
+
+    # this chunk works
     array_variance_big = array_variance
     #dict_profiles_array_big = 
-
     phi = dict_profiles_array[:, :, col]
     D = D[:, col]
     array_variance_big = array_variance_big[:, col]
+
 
     # Compute S^-2
     S_inv_squared = 1 / array_variance_big  # Shape: (M,) # CORRECT
@@ -57,12 +70,12 @@ def worker2(variables_to_pass):
     # Compute the element-wise product of phi and S^-2
     phi_S = phi * S_inv_squared  # Shape: (N, M) - broadcasting S_inv_squared across rows
 
-    c_matrix_big = np.dot(phi_S, phi.T)
+    c_matrix_big = np.dot( phi_S, phi.T )
 
     # Compute b
     b_matrix_big = np.dot( phi, np.multiply(D, S_inv_squared) )  # np.matmul works too, since one matrix is 1D # CORRECT
 
-    c_mat_prime = np.dot(phi, phi.T)
+    c_mat_prime = np.dot( phi, phi.T )
     b_mat_prime = np.dot( phi, (array_variance_big - n_rd**2) )
     
     # solve for the following transform:
@@ -82,6 +95,8 @@ def worker2(variables_to_pass):
         # if there is non-convergence (i.e., nans)
         eta_flux_mat_T = np.nan * np.ones(12)
         var_mat_T = np.nan * np.ones(12)
+    t1 = time.time()
+    #ipdb.set_trace()
 
     return col, eta_flux_mat_T.T, var_mat_T.T
 
