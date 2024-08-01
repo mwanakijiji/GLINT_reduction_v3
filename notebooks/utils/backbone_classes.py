@@ -115,14 +115,14 @@ def worker2(variables_to_pass):
             # Solve the least squares problem for each slice
             result_eta, _, _, _ = lstsq(c_matrix_big[:, :, i], b_matrix_big[:, i])
             result_var, _, _, _ = lstsq(c_mat_prime[:, :, i], b_mat_prime[:, i])
+            #result_eta, _, _, _ = np.linalg.lstsq(c_matrix_big[:, :, i], b_matrix_big[:, i], rcond=None)
+            #result_var, _, _, _ = np.linalg.lstsq(c_mat_prime[:, :, i], b_mat_prime[:, i], rcond=None)
             # Store the result
             eta_flux_mat_T_reshaped[:, i] = result_eta
             var_mat_T_reshaped[:, i] = result_var
         except:
             eta_flux_mat_T_reshaped[:, i] = np.nan * np.ones(12)
             var_mat_T_reshaped[:, i] = np.nan * np.ones(12)
-
-    ### insert var; then move worker2 outside of list comprehension; then time it; then generalize shapes (remove the 12, 512, etc.)
 
     return eta_flux_mat_T_reshaped, var_mat_T_reshaped
 
@@ -145,7 +145,6 @@ def worker(variables_to_pass):
     c_mat_prime = np.sum(temp_array, axis=1)
     b_mat_prime = np.sum((array_variance[:, col] - n_rd**2)[:, np.newaxis].T * dict_profiles_array[:, :, col], axis=1)
 
-    ipdb.set_trace()
 
     # solve for the following transform:
     # x * c_mat = b_mat  -->  c_mat.T * x.T = b_mat.T
@@ -372,7 +371,13 @@ class Extractor():
 
             # list comprehension over all the columns
             eta_results, var_results = worker2([*variables_to_pass])
+
             time_1 = time.time()
             print('---------')
             print('Full array time taken:')
             print(time_1 - time_0)
+
+            
+            # update the spectral object
+            target_instance.spec_flux = {str(i): eta_results[i, :] for i in range(eta_results.shape[0])}
+            target_instance.vark = {str(i): var_results[i, :] for i in range(var_results.shape[0])}
