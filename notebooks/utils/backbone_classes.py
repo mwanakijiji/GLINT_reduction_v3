@@ -105,12 +105,8 @@ def worker(variables_to_pass):
     eta_flux_mat_T_reshaped = np.zeros((12, 512))
     var_mat_T_reshaped = np.zeros((12, 512))
 
-    # test
-    #eta_flux_mat_T_reshaped = np.linalg.lstsq(c_matrix_big.transpose(2, 0, 1), b_matrix_big.transpose(1, 0))[0].transpose(1, 0)
-    #var_mat_T_reshaped = np.linalg.lstsq(c_mat_prime.transpose(2, 0, 1), b_mat_prime.transpose(1, 0))[0].transpose(1, 0)
-
-    # Iterate over the third dimension
-    for i in range(512):
+    # loop over cols
+    for i in range(np.shape(eta_flux_mat_T_reshaped)[1]):
         try:
             # Solve the least squares problem for each slice
             result_eta, _, _, _ = lstsq(c_matrix_big[:, :, i], b_matrix_big[:, i])
@@ -124,6 +120,7 @@ def worker(variables_to_pass):
             eta_flux_mat_T_reshaped[:, i] = np.nan * np.ones(12)
             var_mat_T_reshaped[:, i] = np.nan * np.ones(12)
 
+    
     return eta_flux_mat_T_reshaped, var_mat_T_reshaped
 
 

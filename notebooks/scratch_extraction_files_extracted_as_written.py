@@ -105,6 +105,7 @@ def main():
     # retrieve a variance image
     # (do not fix bad pixels! causes math to fail)
     readout_variance = fits.open(config['file_names']['FILE_NAME_VAR'])[0].data
+    readout_variance[readout_variance == 0] = np.nanmedian(readout_variance) # replace 0.0 pixels (since this will lead to infs later)
 
     if (config['options']['ROT_LEFT'] == '1'): readout_variance = np.rot90(readout_variance, k=1)
 
