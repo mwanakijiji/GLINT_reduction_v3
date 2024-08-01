@@ -30,7 +30,7 @@ def rearrange_into_big_2d(matrix_input, P):
     
     return larger_matrix
 
-def worker2(variables_to_pass):
+def worker(variables_to_pass):
     '''
     Does detector-array-column specific reductions with matrix math
     '''
@@ -125,41 +125,6 @@ def worker2(variables_to_pass):
             var_mat_T_reshaped[:, i] = np.nan * np.ones(12)
 
     return eta_flux_mat_T_reshaped, var_mat_T_reshaped
-
-
-def worker(variables_to_pass):
-
-    col, dict_profiles_array, D, array_variance, n_rd = variables_to_pass
-
-    temp_array = np.matmul(dict_profiles_array[:, :, col, np.newaxis].transpose(1,0,2), dict_profiles_array[:, :, col, np.newaxis].T.transpose(1,0,2)).transpose(1,0,2)
-
-    # vectorized form of Sharp and Birchall 2010, Eqn. 9 (c_mat is c_kj matrix; b_mat is b_j matrix)
-    # (this is equivalent to a for loop over rows of the c_matrix, enclosing a for loop over all spectra (or, equivalently, across all cols of the c_matrix)
-    c_mat = np.sum(temp_array / array_variance[np.newaxis, :, col, np.newaxis], axis=1)
-
-    # b_mat is just 1D; Sharp and Birchall 2010, Eqn. 10
-    b_mat = np.sum(D[:, col] * dict_profiles_array[:, :, col] / array_variance[:, col], axis=1)
-
-    # equivalent expressions for variance, Sharp and Birchall 2010, Eqn. 19 (c_mat_prime is c'_kj matrix; b_mat is b'_j matrix)
-    # (note we are treating sqrt(var(Di))=sigmai in Sharp and Birchall's notation)
-    c_mat_prime = np.sum(temp_array, axis=1)
-    b_mat_prime = np.sum((array_variance[:, col] - n_rd**2)[:, np.newaxis].T * dict_profiles_array[:, :, col], axis=1)
-
-
-    # solve for the following transform:
-    # x * c_mat = b_mat  -->  c_mat.T * x.T = b_mat.T
-    # we want to solve for x, which is equivalent to spectral flux matrix eta_flux_mat (eta_k in Eqn. 9)
-    try:
-        # solve Sharp and Birchall 2010, Eqn. 11
-        eta_flux_mat_T, _, _, _ = np.linalg.lstsq(c_mat.T, b_mat.T, rcond=None)
-        # solve Sharp and Birchall 2010, Eqn. 19
-        var_mat_T, _, _, _ = np.linalg.lstsq(c_mat_prime.T, b_mat_prime.T, rcond=None)
-    except:
-        # if there is non-convergence (i.e., nans)
-        eta_flux_mat_T = np.nan * np.ones(12)
-        var_mat_T = np.nan * np.ones(12)
-
-    return col, eta_flux_mat_T.T, var_mat_T.T
 
 
 def update_results(results, eta_flux, vark):
@@ -344,33 +309,11 @@ class Extractor():
         variables_to_pass = [dict_profiles_array, D, array_variance, n_rd]
 
         # treat the columns in series or in parallel?
-        if process_method == 'parallel':    
-            time_0 = time.time()
-            results = self.pool.map(worker, [(col, *variables_to_pass) for col in range(x_extent)])
-            self.pool.close()
-            self.pool.join()
-            update_results(results, eta_flux, vark)
-            time_1 = time.time()
-            print('---------')
-            print('Full array time taken:')
-            print(time_1 - time_0)
-
-        elif process_method == 'series':
-            time_0 = time.time()
-            results = []
-
-            # list comprehension over all the columns
-            results = [worker([col, *variables_to_pass]) for col in range(x_extent)]
-            update_results(results, eta_flux, vark)
-            time_1 = time.time()
-            print('---------')
-            print('Full array time taken:')
-            print(time_1 - time_0)
-        elif process_method == 'series_worker2':
+        if process_method == 'series':
             time_0 = time.time()
 
             # list comprehension over all the columns
-            eta_results, var_results = worker2([*variables_to_pass])
+            eta_results, var_results = worker([*variables_to_pass])
 
             time_1 = time.time()
             print('---------')
@@ -381,3 +324,6 @@ class Extractor():
             # update the spectral object
             target_instance.spec_flux = {str(i): eta_results[i, :] for i in range(eta_results.shape[0])}
             target_instance.vark = {str(i): var_results[i, :] for i in range(var_results.shape[0])}
+
+        else:
+            print('No parallel method available right now.')
