@@ -287,6 +287,13 @@ def simple_profile_rot(array_shape, x_left, y_left, len_profile, sigma_pass=1, a
     array_profile = np.zeros(array_shape)
 
     xgrid, ygrid = np.meshgrid(np.arange(0,np.shape(array_profile)[1]),np.arange(0,np.shape(array_profile)[0]))
+    array_profile = gauss1d(x_left=x_left, 
+                                len_spec=len_profile, 
+                                x_pass=ygrid, 
+                                lambda_pass=xgrid, 
+                                mu_pass=y_left, 
+                                sigma_pass=sigma_pass)
+    '''
     array_profile = gauss1d_rot(x_left=x_left, 
                                 len_spec=len_profile, 
                                 x_pass=ygrid, 
@@ -294,6 +301,7 @@ def simple_profile_rot(array_shape, x_left, y_left, len_profile, sigma_pass=1, a
                                 mu_pass=y_left, 
                                 sigma_pass=sigma_pass, 
                                 angle_rot=angle_rot)
+    '''
 
     #plt.imshow(array_profile)
     #plt.show()
