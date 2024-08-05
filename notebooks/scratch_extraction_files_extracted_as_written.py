@@ -106,6 +106,7 @@ def main():
     # (do not fix bad pixels! causes math to fail)
     readout_variance = fits.open(config['file_names']['FILE_NAME_VAR'])[0].data
     readout_variance[readout_variance == 0] = np.nanmedian(readout_variance) # replace 0.0 pixels (since this will lead to infs later)
+    readout_variance[readout_variance < 0] = np.nanmedian(readout_variance)
 
     if (config['options']['ROT_LEFT'] == '1'): readout_variance = np.rot90(readout_variance, k=1)
 
@@ -120,11 +121,15 @@ def main():
         # Get the current list of files in the directory
         current_files = os.listdir(dir_spectra_parent)
 
-        # Find the new files that have appeared
-        new_files = [file for file in current_files if file not in initial_files]
+        if (config['options']['WHICH_FILES'] == 'all'):
+            # the new files that have appeared
+            list_files = [file for file in current_files if file not in initial_files]
+        elif (config['options']['WHICH_FILES'] == 'new'):
+            # all pre-existing files
+            list_files = current_files
 
         # Process the new files
-        for file in new_files:
+        for file in list_files:
             start_time = time.time()
 
             # Construct the full path to the file
@@ -134,21 +139,23 @@ def main():
             hdul = fits.open(file_path)
 
             if len(np.shape(hdul[0].data)) > 2:
-                readout_data = hdul[0].data[0,:,:]
+                if (config['options']['WHICH_SLICE'] == '0'):
+                    readout_data = hdul[0].data[0,:,:]
             else:
                 readout_data = hdul[0].data
-            # make negative numbers zero ## ## TODO: make better badpix mask
+            # some ad hoc bad pix fixing ## ## TODO: make better badpix mask
             readout_data[readout_data<0] = 0
             readout_data = fcns.fix_bad(array_pass=readout_data, badpix_pass=badpix_mask)
+            readout_data[readout_data < 0] = np.nanmedian(readout_data)
 
             # rotate image CCW? (to get spectra along x-axis)
             if (config['options']['ROT_LEFT'] == '1'): readout_data = np.rot90(readout_data, k=1)
 
             # translate the image to align it with the basis lamp (i.e., with the wavelength solns)
+            '''
             readout_data = shift.shiftnd(readout_data, (-yoff, -xoff))
             readout_variance = shift.shiftnd(readout_variance, (-yoff, -xoff))
-            readout_data[readout_data<0] = 0
-            readout_variance[readout_variance<0] = 0
+            '''
 
             # initialize basic spectrum object which contains spectra info
             spec_obj = backbone_classes.SpecData(num_spec = len(abs_pos_00), 
@@ -185,7 +192,6 @@ def main():
             end_time = time.time()
             execution_time = end_time - start_time
             print("Execution time total:", execution_time, "seconds")
-            #print(time1_d, time2_d, time3_d, time4_d, time5_d, time6_d, time7_d, time8_d)
 
             # make FYI plots of extracted spectra
             # loop over all spectra on that detector frame

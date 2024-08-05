@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import ipdb
+import scipy
 import astropy.io.fits as fits
 from scipy.optimize import curve_fit
 from scipy.sparse.linalg import lsmr
@@ -43,11 +45,19 @@ def stacked_profiles(target_instance, abs_pos, len_spec, sigma=1):
     for spec_num in range(0,len(abs_pos)):
 
         # these profiles are exactly horizontal
+        dict_profiles[str(spec_num)] = simple_profile_rot(array_shape = array_shape, 
+                                                                x_left=abs_pos[str(spec_num)][0], 
+                                                                y_left=abs_pos[str(spec_num)][1], 
+                                                                len_profile=len_spec, 
+                                                                sigma_pass=sigma,
+                                                                angle_rot=0)
+        '''
         dict_profiles[str(spec_num)] = simple_profile(array_shape = array_shape, 
                                                                 x_left=abs_pos[str(spec_num)][0], 
                                                                 y_left=abs_pos[str(spec_num)][1], 
                                                                 len_profile=len_spec, 
                                                                 sigma_pass=sigma)
+        '''
         
         # add a little bit of noise for troubleshooting
         #dict_profiles[str(spec_num)] += (1e-3)*np.random.rand(np.shape(dict_profiles[str(spec_num)])[0],np.shape(dict_profiles[str(spec_num)])[1])
@@ -184,6 +194,47 @@ def read_fits_file(file_path):
 
 
 # gaussian profile (kind of confusing: coordinates are (lambda, x), instead of (x,y) )
+def gauss1d_rot(x_left, len_spec, x_pass, lambda_pass, mu_pass, sigma_pass=1, angle_rot=0):
+    '''
+    x_left: x coord of leftmost pixel of spectrum (y coord is assumed to be mu_pass)
+    len_spec: length of spectrum [pix]
+    x_pass: grid of y-coords in coord system of input
+    lambda_pass: grid of x-coords in coord system of input
+    mu_pass: profile center (in x_pass coords)
+    sigma_pass: profile width (in x_pass coords)
+    angle_rot: rotation angle in degrees
+    Returns:
+        profile: Gaussian profile
+    '''
+
+    # tile the image left and right (otherwise, profiles may end before reaching the edges of a rotated array)
+    x_pass_tiled = np.concatenate((x_pass, x_pass, x_pass), axis=1)
+    x_pass_tiled_rot = scipy.ndimage.rotate(x_pass_tiled, angle_rot, reshape=False)
+    # crop the left and right sides again
+    x_rot = x_pass_tiled_rot[:, np.shape(x_pass)[1]:2*np.shape(x_pass)[1]]
+
+    # rotate lambda_pass (but allow cut-off at the ends of the rotated array)
+    lambda_rot = scipy.ndimage.rotate(lambda_pass, angle_rot, reshape=False)
+
+    # Define the Gaussian profile using the rotated coordinates
+    profile = (1./(sigma_pass*np.sqrt(2.*np.pi))) * np.exp(-0.5 * np.power((x_rot-mu_pass)/sigma_pass, 2.))
+    
+    # condition for lambda axis to be inside footprint
+    lambda_cond = np.logical_and(lambda_rot >= x_left, lambda_rot < x_left+len_spec)
+
+    # mask regions where there is zero signal
+    profile *= lambda_cond
+    
+    # normalize columns of nonzero signal
+    profile = np.divide(profile, np.nanmax(profile))
+    
+    # restore regions of zero signal as zeros (instead of False)
+    profile[~lambda_cond] = 0.
+    
+    return profile
+
+
+# gaussian profile (kind of confusing: coordinates are (lambda, x), instead of (x,y) )
 def gauss1d(x_left, len_spec, x_pass, lambda_pass, mu_pass, sigma_pass=1):
     '''
     x_left: x coord of leftmost pixel of spectrum (y coord is assumed to be mu_pass)
@@ -213,6 +264,45 @@ def gauss1d(x_left, len_spec, x_pass, lambda_pass, mu_pass, sigma_pass=1):
     profile[~lambda_cond] = 0.
     
     return profile
+
+# wrapper to make the enclosing profile of a spectrum
+def simple_profile_rot(array_shape, x_left, y_left, len_profile, sigma_pass=1, angle_rot=0):
+    """
+    Make one simple 1D Gaussian profile in x-direction
+
+    Args: 
+        array_shape (tuple): shape of the array
+        x_left (int): x-coordinate of the leftmost point of the spectrum
+        y_left (int): y-coordinate of the leftmost point of the spectrum
+        len_spec (int): length of the spectrum in the x-direction (pixels)
+        sigma_pass (float): sigma width of the profile (pixels)
+    
+    Returns:
+        numpy.ndarray: 2D array representing the profile on the detector
+    """
+
+    x_left = int(x_left)
+    y_left = int(y_left)
+
+    array_profile = np.zeros(array_shape)
+
+    xgrid, ygrid = np.meshgrid(np.arange(0,np.shape(array_profile)[1]),np.arange(0,np.shape(array_profile)[0]))
+    array_profile = gauss1d_rot(x_left=x_left, 
+                                len_spec=len_profile, 
+                                x_pass=ygrid, 
+                                lambda_pass=xgrid, 
+                                mu_pass=y_left, 
+                                sigma_pass=sigma_pass, 
+                                angle_rot=angle_rot)
+
+    #plt.imshow(array_profile)
+    #plt.show()
+    
+    # normalize it such that the marginalization in x (in (x,lambda) space) is 1
+    # (with a perfect Gaussian profile in x this is redundant)
+    array_profile[:,x_left:x_left+len_profile] = np.divide(array_profile[:,x_left:x_left+len_profile],np.sum(array_profile[:,x_left:x_left+len_profile], axis=0))
+    
+    return array_profile
 
 
 # wrapper to make the enclosing profile of a spectrum
