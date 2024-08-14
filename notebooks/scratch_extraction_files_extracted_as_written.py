@@ -119,14 +119,16 @@ def main():
     # Start monitoring the directory for new files
     while True:
         # Get the current list of files in the directory
-        current_files = os.listdir(dir_spectra_parent)
+        
 
-        if (config['options']['WHICH_FILES'] == 'all'):
+        if (config['options']['WHICH_FILES'] == 'new'):
             # the new files that have appeared
+            current_files = os.listdir(dir_spectra_parent)
             list_files = [file for file in current_files if file not in initial_files]
-        elif (config['options']['WHICH_FILES'] == 'new'):
+        elif (config['options']['WHICH_FILES'] == 'all'):
             # all pre-existing files
-            list_files = current_files
+            list_files = glob.glob(dir_spectra_parent + "*.fits")
+
 
         # Process the new files
         for file in list_files:
@@ -203,17 +205,19 @@ def main():
                     # plot the spectra
                     file_name_plot = config['sys_dirs']['DIR_WRITE_FYI'] + os.path.basename(file_path).split('.')[0] + '.png'
                     if (config['options']['WAVEL_MAP'] == '1'):
-                        plt.plot(spec_obj.wavel_mapped[str(i)], spec_obj.spec_flux[str(i)], label='flux')
-                        plt.plot(spec_obj.wavel_mapped[str(i)], np.sqrt(spec_obj.vark[str(i)]), label='$\sqrt{\sigma^{2}}$')
+                        plt.plot(spec_obj.wavel_mapped[str(i)], spec_obj.spec_flux[str(i)]+3000*i, label='flux')
+                        #plt.plot(spec_obj.wavel_mapped[str(i)], np.sqrt(spec_obj.vark[str(i)]), label='$\sqrt{\sigma^{2}}$')
                     elif (config['options']['WAVEL_MAP'] == '0'):
-                        plt.plot(spec_obj.spec_flux[str(i)], label='flux')
-                        plt.plot(np.sqrt(spec_obj.vark[str(i)]), label='$\sqrt{\sigma^{2}}$')
-                    plt.legend()
+                        plt.plot(spec_obj.spec_flux[str(i)]+3000*i, label='flux')
+                        #plt.plot(np.sqrt(spec_obj.vark[str(i)]), label='$\sqrt{\sigma^{2}}$')
+                    #plt.legend()
+                plt.ylim([0,45000])
                 plt.savefig( file_name_plot )
                 print('Wrote',file_name_plot)
 
         # Update the initial list of files
-        initial_files = current_files
+        if (config['options']['WHICH_FILES'] == 'new'):
+            initial_files = current_files
 
         # Wait for some time before checking again
         time.sleep(1)
