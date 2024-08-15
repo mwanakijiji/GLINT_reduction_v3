@@ -72,32 +72,23 @@ spline = UnivariateSpline(x_coords_sorted, y_coords_sorted, k=1, s=1)
 x_spline = np.linspace(x_coords_sorted.min(), x_coords_sorted.max(), 1000).reshape(-1, 1)
 
 # y_spline = spline(x_spline) # UniVariate
-y_spline = model.predict(x_spline) # Linear regression
+#y_spline = model.predict(x_spline) # Linear regression
+y_spline = x_spline * m_ + b_
 
 
 ## Now make a Gaussian that follows that spline 
 
-# Function to calculate the distance from a point to the spline
-'''
-def distance_to_spline(x, y, spline):
-    y_spline = spline(x)
-    return np.abs(y - y_spline)
-'''
-
 ipdb.set_trace()
 
-#x_coords, y_coords = np.meshgrid(np.arange(np.shape(data)[1]), np.arange(np.shape(data)[0])
-
-distances = np.abs(m * x_coords + b - y_coords) / np.sqrt(m**2 + 1)
-
+# find distances to the spline
+x_mesh, y_mesh = np.meshgrid(np.arange(np.shape(data)[1]), np.arange(np.shape(data)[0]))
+distances = np.abs(m_ * x_mesh + b_ - y_mesh) / np.sqrt(m_**2 + 1)
 
 # Parameters for the Gaussian profile
 sigma = 5  # Standard deviation of the Gaussian
 
 # Create the Gaussian profile
 gaussian_profile = np.exp(-0.5 * (distances / sigma) ** 2)
-
-
 
 # Plot the original data and the fitted spline
 plt.imshow(data, cmap='gray', origin='lower')
