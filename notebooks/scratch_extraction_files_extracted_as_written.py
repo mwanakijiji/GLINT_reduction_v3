@@ -223,7 +223,6 @@ def main():
                         plt.plot(spec_obj.wavel_mapped[str(i)], spec_obj.spec_flux[str(i)]+3000*i, label='flux')
                         #plt.plot(spec_obj.wavel_mapped[str(i)], np.sqrt(spec_obj.vark[str(i)]), label='$\sqrt{\sigma^{2}}$')
                     elif (config['options']['WAVEL_MAP'] == '0'):
-                        ipdb.set_trace()
                         plt.plot(spec_obj.spec_flux[str(i)]+3000*i, label='flux')
                         #plt.plot(np.sqrt(spec_obj.vark[str(i)]), label='$\sqrt{\sigma^{2}}$')
                     #plt.legend()
