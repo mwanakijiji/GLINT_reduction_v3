@@ -196,10 +196,11 @@ def main():
                                                 process_method = config['options']['PROCESS_METHOD'],
                                                 fyi_plot=False)
 
-            # apply the wavelength solution
-            fcns.apply_wavel_solns(num_spec = len(data['rois']), 
-                                   source_instance = wavel_gen_obj, 
-                                   target_instance = spec_obj)
+            if wavel_map == '1':
+                # apply the wavelength solution
+                fcns.apply_wavel_solns(num_spec = len(data['rois']), 
+                                    source_instance = wavel_gen_obj, 
+                                    target_instance = spec_obj)
 
             # write to file
             file_name_write = dir_spectra_write + 'extracted_' + os.path.basename(file_path)
