@@ -9,16 +9,20 @@ import json
 # This script is parented from template_spline_testing.py, but reads in real GLINT data
 
 # file name of an empirical readout
-file_name = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/data/sample_data/datacube_12_channels.fits'
+#file_name = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/data/sample_data/datacube_12_channels.fits'
+file_name = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/data/sample_data/empirical_array_3_channel.fits'
 # just use the first slice, and rotate
 hdul = fits.open(file_name)
-data = np.rot90(hdul[0].data[0])
+
+#data = np.rot90(hdul[0].data[0])
+data = hdul[0].data
 
 plt.imshow(data, vmin=0, vmax=1000, origin='lower')
 plt.show()
 
 # json file defining the ROIs
-file_name_json = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/notebooks/glint_spline_testing.json'
+#file_name_json = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/notebooks/glint_spline_testing.json'
+file_name_json = '/Users/bandari/Documents/git.repos/GLINT_reduction_v3/notebooks/glint_spline_testing_3_channel.json'
 # Read the JSON file
 with open(file_name_json, 'r') as f:
     json_data = json.load(f)

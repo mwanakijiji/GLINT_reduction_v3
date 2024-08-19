@@ -27,7 +27,8 @@ def main():
 
     # Read the config file
     config = configparser.ConfigParser(interpolation=ExtendedInterpolation())
-    config.read('config_12_channel_cred2.ini')
+    #config.read('config_12_channel_cred2.ini') 
+    config.read('config_fake_seeing_20240509.ini')
 
     # make directories if they don't exist yet
     [os.makedirs(value, exist_ok=True) for value in config['sys_dirs'].values()]
