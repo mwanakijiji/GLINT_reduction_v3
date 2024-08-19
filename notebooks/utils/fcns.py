@@ -118,6 +118,8 @@ def write_to_file(target_instance, file_write):
             fits.Column(name=f'spec_{str(i).zfill(2)}_wavel', format='D', array=target_instance.wavel_mapped[str(i)], unit=f'Wavelength (A)', disp='F8.3')
             for i in target_instance.spec_flux
             ])
+    except:
+        print('No wavelength mapping being written out')
     coldefs_x_pix = fits.ColDefs([ 
         fits.Column(name=f'spec_{str(i).zfill(2)}_xpix', format='D', array=target_instance.spec_x_pix[str(i)], unit=f'Pix (x)', disp='F8.3')
         for i in target_instance.spec_flux
