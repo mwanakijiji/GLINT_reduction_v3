@@ -76,10 +76,10 @@ def stacked_profiles(target_instance, abs_pos, len_spec, profiles_file_name=None
             dict_profiles[str(spec_num)] = profiles[spec_num,:,:]
         
         # store the (x,y) values of this spectrum
-        ## TBD: improve this later by actually following the spine of the profile
+        ## TO DO: improve this later by actually following the spine of the profile
         ## ... and allow for fractional pixels
         target_instance.spec_x_pix[str(spec_num)] = np.arange(array_shape[1])
-        target_instance.spec_y_pix[str(spec_num)] = float(abs_pos[str(spec_num)][1]) * np.ones(array_shape[0])
+        target_instance.spec_y_pix[str(spec_num)] = None # float(abs_pos[str(spec_num)][1]) * np.ones(array_shape[0])
 
     target_instance.dict_profiles = dict_profiles
 
