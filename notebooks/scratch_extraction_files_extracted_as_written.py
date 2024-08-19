@@ -33,6 +33,9 @@ def main():
     # make directories if they don't exist yet
     [os.makedirs(value, exist_ok=True) for value in config['sys_dirs'].values()]
 
+    # dummy to make function work later if this is not used
+    abs_pos_00 = None
+
     # directory containing files to 'extract'
     dir_spectra_parent = config['sys_dirs']['DIR_DATA'] # fake data made from real
     # Glob the directories inside the specified directory
@@ -170,12 +173,12 @@ def main():
             '''
 
             # initialize basic spectrum object which contains spectra info
-            spec_obj = backbone_classes.SpecData(num_spec = len(abs_pos_00), 
+            spec_obj = backbone_classes.SpecData(num_spec = len(data['rois']), 
                                                 len_spec = np.shape(test_data_slice)[1], 
                                                 sample_frame = test_data_slice)
 
             # instantiate extraction machinery
-            extractor = backbone_classes.Extractor(num_spec = len(abs_pos_00),
+            extractor = backbone_classes.Extractor(num_spec = len(data['rois']),
                                                 len_spec = np.shape(test_data_slice)[1])
             
             # generate a profile for each spectrum, and update the spec_obj with them
@@ -194,7 +197,7 @@ def main():
                                                 fyi_plot=False)
 
             # apply the wavelength solution
-            fcns.apply_wavel_solns(num_spec = len(abs_pos_00), 
+            fcns.apply_wavel_solns(num_spec = len(data['rois']), 
                                    source_instance = wavel_gen_obj, 
                                    target_instance = spec_obj)
 
