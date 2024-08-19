@@ -68,7 +68,7 @@ def worker(variables_to_pass):
  
     array_variance_big = array_variance
 
-
+    ipdb.set_trace()
 
     # Compute S^-2
     S_inv_squared = 1 / array_variance_big  # Shape: (M,) # CORRECT
@@ -83,7 +83,7 @@ def worker(variables_to_pass):
     # Compute b
     #b_matrix_big = np.dot( phi, np.multiply(D, S_inv_squared) )  # np.matmul works too, since one matrix is 1D # CORRECT
     b_matrix_big = np.einsum('ijk,jk->ik', phi, np.multiply(D, S_inv_squared))
-
+    ipdb.set_trace()
 
     #c_mat_prime = np.dot( phi, phi.T )
     c_mat_prime = np.einsum('ijk,jlk->ilk', phi, np.transpose(phi, (1, 0, 2)))
@@ -95,7 +95,7 @@ def worker(variables_to_pass):
     median_value_c = np.median(finite_values_c)
     non_finite_mask_c = ~np.isfinite(c_matrix_big)
     c_matrix_big[non_finite_mask_c] = median_value_c # Replace non-finite values with the median value
-
+    ipdb.set_trace()
     finite_values_b = b_matrix_big[np.isfinite(b_matrix_big)]
     median_value_b = np.median(finite_values_b)
     non_finite_mask_b = ~np.isfinite(b_matrix_big) # mask for the non-finite values
@@ -104,7 +104,7 @@ def worker(variables_to_pass):
     # Initialize an array to store the results
     eta_flux_mat_T_reshaped = np.zeros((12, 512))
     var_mat_T_reshaped = np.zeros((12, 512))
-
+    ipdb.set_trace()
     # loop over cols
     for i in range(np.shape(eta_flux_mat_T_reshaped)[1]):
         try:
