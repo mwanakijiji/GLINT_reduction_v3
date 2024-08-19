@@ -118,7 +118,10 @@ def main():
     if (config['options']['ROT_LEFT'] == '1'): readout_variance = np.rot90(readout_variance, k=1)
 
     # find offset from lamp basis image
+    '''
+    # removed temporarily to get pipeline to work on simple dataset
     xoff, yoff, exoff, eyoff = chi2_shift(wavel_gen_obj.lamp_basis_frame, lamp_array_this)
+    '''
     
     # Get the initial list of files in the directory
     initial_files = os.listdir(dir_spectra_parent)
