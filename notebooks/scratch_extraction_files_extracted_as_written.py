@@ -172,6 +172,7 @@ def main():
             fcns.stacked_profiles(target_instance = spec_obj,
                                                 abs_pos = abs_pos_00,
                                                 len_spec = np.shape(test_data_slice)[1],
+                                                profiles_file_name = config['file_names']['FILE_NAME_PROFILES'],
                                                 sigma = 2)
 
             # do the actual spectral extraction, and update the spec_obj with them

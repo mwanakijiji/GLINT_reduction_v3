@@ -26,6 +26,9 @@ with open(file_name_json, 'r') as f:
 # Extract the coordinates from the JSON data
 rois = json_data['rois']
 
+# initialize the cube to hold profiles
+profile_cube = np.zeros((len(rois),np.shape(data)[0],np.shape(data)[1]))
+
 # loop over each of the ROIs
 for roi_num in range(len(rois)):
 
@@ -33,7 +36,7 @@ for roi_num in range(len(rois)):
     x_max, y_max = rois[str(roi_num)][1]
 
     # Threshold to identify high-value pixels
-    threshold = 800  # Adjust this threshold based on your data
+    threshold = 500  # Adjust this threshold based on your data
 
     # Extract coordinates of high-value pixels
     high_value_coords = np.argwhere(data > threshold)
@@ -75,10 +78,16 @@ for roi_num in range(len(rois)):
     distances = np.abs(m_ * x_mesh + b_ - y_mesh) / np.sqrt(m_**2 + 1)
 
     # Parameters for the Gaussian profile
-    sigma = 5  # Standard deviation of the Gaussian
+    sigma = 2  # Standard deviation of the Gaussian
 
     # Create the Gaussian profile
     gaussian_profile = np.exp(-0.5 * (distances / sigma) ** 2)
+
+    # normalize each column
+    for i in range(np.shape(gaussian_profile)[1]):
+        gaussian_profile[:,i] /= np.sum(gaussian_profile[:,i])
+
+    profile_cube[roi_num,:,:] = gaussian_profile
 
     # Plot the original data and the fitted spline
     plt.imshow(data, cmap='gray', origin='lower')
@@ -92,3 +101,8 @@ for roi_num in range(len(rois)):
     plt.colorbar(label='Gaussian Intensity')
     plt.title('2D Gaussian Profile with Peak Along Spline')
     plt.show()
+
+# Write profile_cube to a FITS file
+file_name = './junk_profile_cube_12channel.fits'
+fits.writeto(file_name, profile_cube, overwrite=True)
+print('Wrote',file_name)
