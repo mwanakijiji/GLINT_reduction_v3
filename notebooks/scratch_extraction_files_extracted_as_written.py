@@ -97,13 +97,13 @@ def main():
 
         # read in a lamp basis image (to find offsets later)
         wavel_gen_obj.add_basis_image(file_name = config['file_names']['FILE_NAME_BASISLAMP'])
-        
+
     if (config['options']['ROT_LEFT'] == '1'): wavel_gen_obj.lamp_basis_frame = np.rot90(wavel_gen_obj.lamp_basis_frame, k=1)
 
     # retrieve lamp image
     lamp_file_name = glob.glob(config['file_names']['FILE_NAME_THISLAMP'])
     lamp_data = fits.open(lamp_file_name[0]) # list of files should just have one element
-    lamp_array_this = lamp_data[0].data
+    lamp_array_this = lamp_data[0].data[0,:,:]
     lamp_array_this = fcns.fix_bad(array_pass=lamp_array_this, badpix_pass=badpix_mask) # fix bad pixels
 
     # rotate image CCW? (to get spectra along x-axis)
