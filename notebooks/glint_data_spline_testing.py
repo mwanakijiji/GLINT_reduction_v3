@@ -17,6 +17,8 @@ hdul = fits.open(file_name)
 #data = np.rot90(hdul[0].data[0])
 data = hdul[0].data
 
+ipdb.set_trace()
+
 plt.imshow(data, vmin=0, vmax=1000, origin='lower')
 plt.show()
 
