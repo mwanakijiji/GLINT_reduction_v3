@@ -26,13 +26,16 @@ def apply_wavel_solns(num_spec, source_instance, target_instance):
     return None
 
 
-def stacked_profiles(target_instance, abs_pos, len_spec, sigma=1):
+def stacked_profiles(target_instance, abs_pos, len_spec, profiles_file_name=None, sigma=1):
     '''
     Generates a dictionary of profiles based on (x,y) starting positions of spectra
+    (This is basically a quick way to set up simple simple horizontal profiles)
 
     Args:
         target_instance (object): The instance of the Extractor class.
+        len_spec: the length of the spectra, in pixels
         abs_pos (dict): A dictionary containing the (x,y) starting positions of spectra.
+        profiles_file_name: the file name of the profiles to use (if None, then a simple set of profiles is generated)
         sigma (float, optional): The standard deviation of the Gaussian profile, in pixel units. Defaults to 1.
 
     Returns:
@@ -42,26 +45,36 @@ def stacked_profiles(target_instance, abs_pos, len_spec, sigma=1):
     array_shape = np.shape(target_instance.sample_frame)
         
     dict_profiles = {}
-    for spec_num in range(0,len(abs_pos)):
 
-        # these profiles are exactly horizontal
-        dict_profiles[str(spec_num)] = simple_profile_rot(array_shape = array_shape, 
-                                                                x_left=abs_pos[str(spec_num)][0], 
-                                                                y_left=abs_pos[str(spec_num)][1], 
-                                                                len_profile=len_spec, 
-                                                                sigma_pass=sigma,
-                                                                angle_rot=0)
-        '''
-        dict_profiles[str(spec_num)] = simple_profile(array_shape = array_shape, 
-                                                                x_left=abs_pos[str(spec_num)][0], 
-                                                                y_left=abs_pos[str(spec_num)][1], 
-                                                                len_profile=len_spec, 
-                                                                sigma_pass=sigma)
-        '''
+    if profiles_file_name is None:
+        for spec_num in range(0,len(abs_pos)):
+
+            # these profiles are exactly horizontal
+            dict_profiles[str(spec_num)] = simple_profile(array_shape = array_shape, 
+                                                                    x_left=abs_pos[str(spec_num)][0], 
+                                                                    y_left=abs_pos[str(spec_num)][1], 
+                                                                    len_profile=len_spec, 
+                                                                    sigma_pass=sigma)
         
         # add a little bit of noise for troubleshooting
         #dict_profiles[str(spec_num)] += (1e-3)*np.random.rand(np.shape(dict_profiles[str(spec_num)])[0],np.shape(dict_profiles[str(spec_num)])[1])
 
+        # store the (x,y) values of this spectrum
+        ## TBD: improve this later by actually following the spine of the profile
+        ## ... and allow for fractional pixels
+        target_instance.spec_x_pix[str(spec_num)] = np.arange(array_shape[1])
+        target_instance.spec_y_pix[str(spec_num)] = float(abs_pos[str(spec_num)][1]) * np.ones(array_shape[0])
+
+    else:
+        # read in profiles
+        profiles_data = fits.open(profiles_file_name)
+        profiles = profiles_data[0].data
+
+        for spec_num in range(0,len(abs_pos)):
+
+            # these profiles are exactly horizontal
+            dict_profiles[str(spec_num)] = profiles[spec_num,:,:]
+        
         # store the (x,y) values of this spectrum
         ## TBD: improve this later by actually following the spine of the profile
         ## ... and allow for fractional pixels
