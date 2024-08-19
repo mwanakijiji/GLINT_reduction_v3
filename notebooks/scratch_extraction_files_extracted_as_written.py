@@ -33,8 +33,8 @@ def main():
     # make directories if they don't exist yet
     [os.makedirs(value, exist_ok=True) for value in config['sys_dirs'].values()]
 
-    # dummy to make function work later if this is not used
-    abs_pos_00 = None
+    # dummy/kludge to make function work later if this is not used
+    abs_pos_00 = [1,1,1] # needs to have length of the number of spectra
 
     # directory containing files to 'extract'
     dir_spectra_parent = config['sys_dirs']['DIR_DATA'] # fake data made from real
