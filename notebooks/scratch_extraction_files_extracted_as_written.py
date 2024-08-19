@@ -82,7 +82,7 @@ def main():
 
     if wavel_map == '1':
         # generate the basis wavelength solution
-        wavel_gen_obj = backbone_classes.GenWavelSoln(num_spec = len(abs_pos_00), 
+        wavel_gen_obj = backbone_classes.GenWavelSoln(num_spec = len(data['rois']), 
                                                     dir_read = config['sys_dirs']['DIR_PARAMS_DATA'], 
                                                     wavel_array = np.array(wavel_array))
 
