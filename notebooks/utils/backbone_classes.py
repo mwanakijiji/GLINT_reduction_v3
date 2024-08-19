@@ -308,7 +308,7 @@ class Extractor():
         # treat the columns in series or in parallel?
         if process_method == 'series':
             time_0 = time.time()
-
+            ipdb.set_trace()
             # list comprehension over all the columns
             eta_results, var_results = worker([*variables_to_pass])
 
