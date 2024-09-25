@@ -4,6 +4,7 @@ import time
 import os
 import ipdb
 import shutil
+import glob
 
 from astropy.io import fits
 
@@ -50,18 +51,6 @@ data = hdul[0].data
 # Loop over each slice in the cube
 for i, slice_data in enumerate(data):
 
-    '''
-    # for bug-checking
-    if i==1:
-        slice_data[354:406,119:124] = slice_data[354:406,119:124] + 4000
-    elif i==2:
-        slice_data[181:205,274:280] = slice_data[181:205,274:280] + 4000
-    elif i==3:
-        slice_data[195:243,335:340] = slice_data[195:243,335:340] + 4000
-    elif i==4:
-        ipdb.set_trace()
-    '''
-
     # Create the output file name
     output_file = os.path.join(destination_dir, f'slice_{i}.fits')
     
@@ -75,3 +64,31 @@ for i, slice_data in enumerate(data):
     time.sleep(1)
 
 print('All slices written successfully!')
+'''
+
+# METHOD 3: Take a bunch of cubes and write out the first slice of each as a separate file
+
+source_dir = '/import/morgana2/snert/VAMPIRESData/20240509/apapane/'
+destination_dir = '/import/morgana2/snert/VAMPIRESData/20240509/apapane/fake_data/'
+
+file_list = glob.glob(source_dir + "*.fits")
+
+for file_name in file_list:
+
+    # Read the FITS file
+    hdul = fits.open(file_name)
+    data = hdul[0].data
+
+    # write out the first slice
+    slice_data = data[0,:,:]
+
+    # Create a new HDU with the slice data
+    hdu = fits.PrimaryHDU(slice_data)
+    
+    # Save the new FITS file
+    file_name_write = destination_dir + os.path.basename(file_name)
+    hdu.writeto(file_name_write, overwrite=True)
+
+    print('Wrote out ',file_name_write)
+    time.sleep(1)
+'''

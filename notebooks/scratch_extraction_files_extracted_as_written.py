@@ -19,7 +19,7 @@ import warnings
 
 ## ## TBD: make clearer distinction between length of spectra, and that of extraction profile
 
-def main():
+def main(config_file):
 
     # silence some warnings
     os.environ['MKL_DEBUG_CPU_TYPE'] = '5'
@@ -28,7 +28,7 @@ def main():
     # Read the config file
     config = configparser.ConfigParser(interpolation=ExtendedInterpolation())
     #config.read('config_12_channel_cred2.ini') 
-    config.read('config_fake_seeing_20240509.ini')
+    config.read(config_file)
 
     # make directories if they don't exist yet
     [os.makedirs(value, exist_ok=True) for value in config['sys_dirs'].values()]
@@ -238,4 +238,5 @@ def main():
         time.sleep(1)
 
 if __name__ == "__main__":
-    cProfile.run('main()', 'profile_stats.prof')
+    #cProfile.run('main()', 'profile_stats.prof')
+    main(config_file = 'config_fake_seeing_20240509.ini')
