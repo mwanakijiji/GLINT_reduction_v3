@@ -4,6 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
 
+# Makes flats for GLINT engineering data from 2024 Sept.
+
 stem = '/import/morgana1/snert/GLINTData/data202409/20240919/apapane/'
 
 file_list_fiber_in = glob.glob(stem + 'apapane_03:3[0-2]*fits')
